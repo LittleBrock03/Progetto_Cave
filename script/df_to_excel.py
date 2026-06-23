@@ -6,7 +6,6 @@ from openpyxl import load_workbook
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).resolve().parent
@@ -19,11 +18,6 @@ EXPORT_PATH = EXPORT_DIR / "report.xlsx"
 
 def _normalizza_nome_colonna(nome):
     return str(nome).replace("_", " ").title()
-
-
-def _nome_tabella(nome):
-    pulito = "".join(car for car in str(nome).title() if car.isalnum())
-    return (pulito or "Tabella")[:200]
 
 
 def _stile_intestazione(ws):
@@ -40,27 +34,10 @@ def _stile_intestazione(ws):
     ws.row_dimensions[1].height = 24
 
 
-def _aggiungi_tabella(ws, nome):
-    if ws.max_row <= 1 or ws.max_column <= 1:
-        return
-
-    table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
-    table = Table(displayName=_nome_tabella(nome), ref=table_ref)
-    table.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium4",
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=False,
-        showColumnStripes=False,
-    )
-    ws.add_table(table)
-
-
 def _formatta_foglio_principale(ws, config_report):
     ws.title = config_report.get("main_sheet", "Report")
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = config_report.get("freeze_panes", "A2")
-    ws.auto_filter.ref = ws.dimensions
 
     original_headers = {cell.value: cell.column for cell in ws[1]}
     larghezze = config_report.get("column_widths", {})
@@ -94,8 +71,6 @@ def _formatta_foglio_principale(ws, config_report):
             col_index = original_headers.get(colonna)
             if col_index:
                 row[col_index - 1].number_format = formato
-
-    _aggiungi_tabella(ws, ws.title)
 
     val_tot_col = original_headers.get("Val_tot")
     if val_tot_col and ws.max_row > 1:
@@ -147,8 +122,6 @@ def _scrivi_riepilogo(wb, df, summary_config, index):
             formato = number_formats.get(colonna)
             if formato:
                 row[posizione].number_format = formato
-
-    _aggiungi_tabella(ws, sheet_name)
 
 
 def _formatta_excel(percorso, df, config_report):

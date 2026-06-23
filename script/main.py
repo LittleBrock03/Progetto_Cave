@@ -175,6 +175,55 @@ def applica_campi_calcolati(df, dataset_config, menno):
     return df
 
 
+def _condizione_report(df, regola):
+    colonna = regola.get("column")
+    operatore = regola.get("operator", "eq")
+    if colonna not in df.columns:
+        return pd.Series(False, index=df.index)
+
+    serie = df[colonna]
+    if operatore == "blank":
+        testo = serie.astype("string").str.strip()
+        return serie.isna() | testo.isin(["", "<NA>", "nan", "NaN", "None"])
+
+    if operatore == "not_blank":
+        testo = serie.astype("string").str.strip()
+        return ~(serie.isna() | testo.isin(["", "<NA>", "nan", "NaN", "None"]))
+
+    valore = regola.get("value")
+    if isinstance(valore, (int, float)):
+        numeri = pd.to_numeric(serie, errors="coerce")
+        if operatore == "eq":
+            return numeri.eq(valore)
+        if operatore == "ne":
+            return numeri.ne(valore)
+
+    testo = serie.astype("string").str.strip()
+    valore_testo = str(valore).strip()
+    if operatore == "eq":
+        return testo.eq(valore_testo)
+    if operatore == "ne":
+        return testo.ne(valore_testo)
+
+    raise ValueError(f"Operatore filtro report non supportato: {operatore}")
+
+
+def applica_filtri_report(df, config_report):
+    df_filtrato = df
+    for filtro in config_report.get("drop_rows", []):
+        condizioni = filtro.get("all", [])
+        if not condizioni:
+            continue
+
+        maschera = pd.Series(True, index=df_filtrato.index)
+        for regola in condizioni:
+            maschera &= _condizione_report(df_filtrato, regola)
+
+        df_filtrato = df_filtrato.loc[~maschera].copy()
+
+    return df_filtrato
+
+
 def prepara_base_dati(menno, sorgente, dataset_config):
     df = df_format.esegui(base_dbf_dir(sorgente), dataset_config, menno)
     df = _applica_colonne_dataset(df, dataset_config)
@@ -183,6 +232,7 @@ def prepara_base_dati(menno, sorgente, dataset_config):
 
 
 def applica_config_report(df, config_report):
+    df = applica_filtri_report(df, config_report)
     group_by = config_report.get("group_by", [])
     aggregazioni = config_report.get("aggregations")
     df_report = dc.esegui(df, group_by, aggregazioni)

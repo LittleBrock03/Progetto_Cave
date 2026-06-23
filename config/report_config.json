@@ -149,7 +149,7 @@
         "CODICECF_": "Codice_Cliente_Fornitore",
         "DESTDIV_": "destinazione_diversa",
         "CODICEARTI_": "Codice_Articolo",
-        "UNMISURA_": "unita_misura_docrig",
+        "UNMISURA_": "UM",
         "QUANTITA_": "Quantita",
         "SCONTI_": "Sconti_Docrig",
         "PREZZOUN_": "prezzo_unitario_docrig",
@@ -172,20 +172,43 @@
       "output_file": "report_{periodo_file}.xlsx",
       "main_sheet": "Report",
       "freeze_panes": "D2",
-      "group_by": ["tipo_documento", "Younth", "Codice_Articolo"],
+      "drop_rows": [
+        {
+          "all": [
+            {
+              "column": "Codice_Articolo",
+              "operator": "blank"
+            },
+            {
+              "column": "Val_tot",
+              "operator": "eq",
+              "value": 0
+            }
+          ]
+        }
+      ],
+      "group_by": [
+        "tipo_documento",
+        "gruppo_docrig",
+        "Codice_Articolo",
+        "Codice_Cliente_Fornitore",
+        "Ragione_Sociale",
+        "UM",
+        "Descrizione_Riga"
+      ],
       "aggregations": {
-        "Descrizione_Riga": "first",
         "Quantita": "sum",
         "Val_tot": "sum",
-        "Cava": "first",
-        "Codice_Cliente_Fornitore": "first",
-        "Ragione_Sociale": "first"
+        "Younth": "first",
+        "Cava": "first"
       },
       "columns": [
         "tipo_documento",
         "Younth",
+        "gruppo_docrig",
         "Codice_Articolo",
         "Descrizione_Riga",
+        "UM",
         "Quantita",
         "Val_tot",
         "Cava",
@@ -195,8 +218,10 @@
       "column_widths": {
         "tipo_documento": 16,
         "Younth": 13,
+        "gruppo_docrig": 16,
         "Codice_Articolo": 18,
         "Descrizione_Riga": 54,
+        "UM": 10,
         "Quantita": 14,
         "Val_tot": 15,
         "Cava": 20,
@@ -228,6 +253,21 @@
       "output_file": "righe_dettaglio_{periodo_file}.xlsx",
       "main_sheet": "Dettaglio",
       "freeze_panes": "D2",
+      "drop_rows": [
+        {
+          "all": [
+            {
+              "column": "Codice_Articolo",
+              "operator": "blank"
+            },
+            {
+              "column": "Val_tot",
+              "operator": "eq",
+              "value": 0
+            }
+          ]
+        }
+      ],
       "group_by": [],
       "columns": [
         "tipo_documento",

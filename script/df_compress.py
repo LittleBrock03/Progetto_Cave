@@ -7,7 +7,6 @@ def esegui(df, group_by, aggregazioni=None):
         "Quantita": "sum",
         "Val_tot": "sum",
         "Cava": "first",
-        "Codice_Cliente_Fornitore": "first",
         "Ragione_Sociale": "first",
     }
 
