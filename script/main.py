@@ -121,7 +121,10 @@ def _applica_colonne_dataset(df, dataset_config):
 
 def _calcola_younth(df, menno):
     df = df.rename(columns={"data_documento": "Younth"})
-    df["Younth"] = menno[0]
+    if menno[0] == "__RANGE__":
+        df["Younth"] = pd.to_datetime(df["Younth"], errors="coerce").dt.strftime("%m/%Y")
+    else:
+        df["Younth"] = menno[0]
     return df
 
 
@@ -205,6 +208,13 @@ def prepara_config_periodo(config_report, menno):
     return config_periodo
 
 
+def periodo_intervallo(periodi):
+    data_inizio = min(periodo[1] for periodo in periodi)
+    data_fine = max(periodo[2] for periodo in periodi)
+    print(f"Intervallo lettura DBF: {data_inizio} -> {data_fine}")
+    return "__RANGE__", data_inizio, data_fine
+
+
 def esegui_periodo(menno, nome_report=None, sorgente="rete"):
     config_report = report_config.carica(CONFIG_DIR / "report_config.json", nome_report)
     config_report = prepara_config_periodo(config_report, menno)
@@ -215,8 +225,18 @@ def esegui_periodo(menno, nome_report=None, sorgente="rete"):
 
 def esegui_tutto(nome_report=None, sorgente="rete", numero_mesi=3):
     risultati = []
-    for menno in periodi_da_elaborare(numero_mesi):
-        df_report, config_report = esegui_periodo(menno, nome_report, sorgente)
+    periodi = periodi_da_elaborare(numero_mesi)
+    if not periodi:
+        return risultati
+
+    config_report_base = report_config.carica(CONFIG_DIR / "report_config.json", nome_report)
+    dataset_config = config_report_base["dataset_config"]
+    df_base = prepara_base_dati(periodo_intervallo(periodi), sorgente, dataset_config)
+
+    for menno in periodi:
+        config_report = prepara_config_periodo(config_report_base, menno)
+        df_periodo = df_base[df_base["Younth"].eq(menno[0])].copy()
+        df_report = applica_config_report(df_periodo, config_report)
         risultati.append((df_report, config_report))
     return risultati
 

@@ -18,6 +18,7 @@ export/
 __pycache__/
 *.py[cod]
 build_pyinstaller/
+build_pyinstaller_onedir/
 script/build/
 script/dist/
 *.spec
@@ -26,6 +27,7 @@ script/dist/
 release/*.exe
 release/logs/
 release/config/
+release_fast/
 
 # Ambiente/editor
 .vscode/
