@@ -1,0 +1,12 @@
+tipo        cava
+SL          San_Leo
+SC          San_Carlo
+CO          San_Carlo
+CE          Cesena
+PA          Palazzina
+MA          Manzona
+SA          Santarcangelo
+VE          Verucchio
+LE          Lecceti
+TA          Talamello
+DEPOSITO    Deposito

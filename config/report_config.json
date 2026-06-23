@@ -1,0 +1,278 @@
+{
+  "default_report": "cave_mensile",
+  "datasets": {
+    "arca_documenti": {
+      "sources": {
+        "doctes": {
+          "file": "doctes.DBF",
+          "suffix": "",
+          "columns": [
+            "TIPODOC",
+            "NUMERODOC",
+            "DATADOC",
+            "CODICECF",
+            "NUMERODOCCF",
+            "DESTDIV",
+            "ID"
+          ],
+          "date_filter": {
+            "column": "DATADOC"
+          }
+        },
+        "docrig": {
+          "file": "docrig.DBF",
+          "suffix": "",
+          "columns": [
+            "CODICEARTI",
+            "UNMISURA",
+            "QUANTITA",
+            "SCONTI",
+            "PREZZOUN",
+            "GRUPPO",
+            "DESCRIZION",
+            "PREZZO",
+            "CDCCOSTO",
+            "CDCRICAVO",
+            "CANVDS",
+            "PREZZOACQ",
+            "SCONTIV",
+            "CONTOSCARI",
+            "ID_TESTA"
+          ],
+          "filter_in": {
+            "column": "ID_TESTA",
+            "source": "doctes",
+            "source_column": "ID"
+          }
+        },
+        "vincfatt": {
+          "file": "VINCFATT.DBF",
+          "suffix": "vincfatt",
+          "columns": ["CODICE", "CONTO", "DESCRIZION"]
+        },
+        "canvds": {
+          "file": "CANVDS.DBF",
+          "suffix": "canvds2",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "cdccos": {
+          "file": "cdcedili.DBF",
+          "suffix": "cdcedili3",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "cdcric": {
+          "file": "cdcedili.DBF",
+          "suffix": "cdcedili4",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "maggrp": {
+          "file": "MAGGRP.DBF",
+          "suffix": "maggrp",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "anagrafe": {
+          "file": "anagrafe.DBF",
+          "suffix": "anagrafe",
+          "columns": ["DATADOC", "DESCRIZION", "CODICE"]
+        }
+      },
+      "base_source": "doctes",
+      "joins": [
+        {
+          "source": "docrig",
+          "left_on": "ID_",
+          "right_on": "ID_TESTA_",
+          "how": "inner"
+        },
+        {
+          "source": "vincfatt",
+          "left_on": "CONTOSCARI_",
+          "right_on": "CODICE_vincfatt",
+          "how": "left"
+        },
+        {
+          "source": "canvds",
+          "left_on": "CANVDS_",
+          "right_on": "CODICE_canvds2",
+          "how": "left"
+        },
+        {
+          "source": "cdccos",
+          "left_on": "CDCCOSTO_",
+          "right_on": "CODICE_cdcedili3",
+          "how": "left"
+        },
+        {
+          "source": "cdcric",
+          "left_on": "CDCRICAVO_",
+          "right_on": "CODICE_cdcedili4",
+          "how": "left"
+        },
+        {
+          "source": "maggrp",
+          "left_on": "GRUPPO_",
+          "right_on": "CODICE_maggrp",
+          "how": "left"
+        },
+        {
+          "source": "anagrafe",
+          "left_on": "CODICECF_",
+          "right_on": "CODICE_anagrafe",
+          "how": "inner"
+        }
+      ],
+      "keep_columns": [
+        "TIPODOC_",
+        "NUMERODOC_",
+        "DATADOC_",
+        "CODICECF_",
+        "DESTDIV_",
+        "CODICEARTI_",
+        "UNMISURA_",
+        "QUANTITA_",
+        "SCONTI_",
+        "PREZZOUN_",
+        "GRUPPO_",
+        "CANVDS_",
+        "PREZZOACQ_",
+        "SCONTIV_",
+        "DESCRIZION_",
+        "DESCRIZION_canvds2",
+        "DESCRIZION_cdcedili4",
+        "DESCRIZION_maggrp",
+        "DESCRIZION_anagrafe"
+      ],
+      "rename_columns": {
+        "TIPODOC_": "tipo_documento",
+        "NUMERODOC_": "numero_documento",
+        "DATADOC_": "data_documento",
+        "CODICECF_": "Codice_Cliente_Fornitore",
+        "DESTDIV_": "destinazione_diversa",
+        "CODICEARTI_": "Codice_Articolo",
+        "UNMISURA_": "unita_misura_docrig",
+        "QUANTITA_": "Quantita",
+        "SCONTI_": "Sconti_Docrig",
+        "PREZZOUN_": "prezzo_unitario_docrig",
+        "GRUPPO_": "gruppo_docrig",
+        "CANVDS_": "voce_di_spesa_docrig",
+        "PREZZOACQ_": "Prezzo_Trasp",
+        "SCONTIV_": "sconti_valore_docrig",
+        "DESCRIZION_": "Descrizione_Riga",
+        "DESCRIZION_canvds2": "descrizione_canvds2",
+        "DESCRIZION_cdcedili4": "descrizione_cdcedili4",
+        "DESCRIZION_maggrp": "descrizione_maggrp",
+        "DESCRIZION_anagrafe": "Ragione_Sociale"
+      },
+      "calculated_fields": ["Younth", "Cava", "Val_tot"]
+    }
+  },
+  "reports": {
+    "cave_mensile": {
+      "dataset": "arca_documenti",
+      "output_file": "report_{periodo_file}.xlsx",
+      "main_sheet": "Report",
+      "freeze_panes": "D2",
+      "group_by": ["tipo_documento", "Younth", "Codice_Articolo"],
+      "aggregations": {
+        "Descrizione_Riga": "first",
+        "Quantita": "sum",
+        "Val_tot": "sum",
+        "Cava": "first",
+        "Codice_Cliente_Fornitore": "first",
+        "Ragione_Sociale": "first"
+      },
+      "columns": [
+        "tipo_documento",
+        "Younth",
+        "Codice_Articolo",
+        "Descrizione_Riga",
+        "Quantita",
+        "Val_tot",
+        "Cava",
+        "Codice_Cliente_Fornitore",
+        "Ragione_Sociale"
+      ],
+      "column_widths": {
+        "tipo_documento": 16,
+        "Younth": 13,
+        "Codice_Articolo": 18,
+        "Descrizione_Riga": 54,
+        "Quantita": 14,
+        "Val_tot": 15,
+        "Cava": 20,
+        "Codice_Cliente_Fornitore": 24,
+        "Ragione_Sociale": 36
+      },
+      "wrap_columns": ["Descrizione_Riga"],
+      "number_formats": {
+        "Quantita": "#,##0.00",
+        "Val_tot": "#,##0.00"
+      },
+      "summaries": [
+        {
+          "sheet_name": "Riepilogo",
+          "group_by": ["Cava", "tipo_documento"],
+          "aggregations": {
+            "Quantita": "sum",
+            "Val_tot": "sum"
+          },
+          "number_formats": {
+            "Quantita": "#,##0.00",
+            "Val_tot": "#,##0.00"
+          }
+        }
+      ]
+    },
+    "righe_dettaglio": {
+      "dataset": "arca_documenti",
+      "output_file": "righe_dettaglio_{periodo_file}.xlsx",
+      "main_sheet": "Dettaglio",
+      "freeze_panes": "D2",
+      "group_by": [],
+      "columns": [
+        "tipo_documento",
+        "numero_documento",
+        "Younth",
+        "Codice_Articolo",
+        "Descrizione_Riga",
+        "Quantita",
+        "prezzo_unitario_docrig",
+        "Sconti_Docrig",
+        "Prezzo_Trasp",
+        "sconti_valore_docrig",
+        "Val_tot",
+        "Cava",
+        "Codice_Cliente_Fornitore",
+        "Ragione_Sociale"
+      ],
+      "column_widths": {
+        "Descrizione_Riga": 54,
+        "Ragione_Sociale": 36,
+        "Codice_Cliente_Fornitore": 24
+      },
+      "wrap_columns": ["Descrizione_Riga"],
+      "number_formats": {
+        "Quantita": "#,##0.00",
+        "prezzo_unitario_docrig": "#,##0.00",
+        "Sconti_Docrig": "#,##0.00",
+        "Prezzo_Trasp": "#,##0.00",
+        "sconti_valore_docrig": "#,##0.00",
+        "Val_tot": "#,##0.00"
+      },
+      "summaries": [
+        {
+          "sheet_name": "Riepilogo_Cave",
+          "group_by": ["Cava"],
+          "aggregations": {
+            "Quantita": "sum",
+            "Val_tot": "sum"
+          },
+          "number_formats": {
+            "Quantita": "#,##0.00",
+            "Val_tot": "#,##0.00"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# Dati locali e DBF pesanti
+*.DBF
+*.dbf
+*.CDX
+*.cdx
+*.FPT
+*.fpt
+*.scx
+Analitics.xlsx
+esempi/
+
+# Export generati
+export/
+*.xlsx
+~$*
+
+# Build e cache Python/PyInstaller
+__pycache__/
+*.py[cod]
+build_pyinstaller/
+script/build/
+script/dist/
+*.spec
+
+# Pacchetto eseguibile locale
+release/*.exe
+release/logs/
+release/config/
+
+# Ambiente/editor
+.vscode/
