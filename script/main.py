@@ -24,6 +24,9 @@ DEFAULT_CONFIG_PATH = CONFIG_DIR / "report_config.json"
 
 
 def base_dbf_dir(sorgente):
+    dbf_dir = os.environ.get("PROGETTO_CAVE_DBF_DIR")
+    if dbf_dir:
+        return Path(dbf_dir)
     return RETE_DIR if sorgente == "rete" else ESEMPI_DIR
 
 
