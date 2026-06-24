@@ -119,4 +119,5 @@ def esegui(percorso_dbf, col_u, msg, filtro=None):
                 for col in nomi_campi
             })
 
-    return pd.DataFrame.from_records(records)
+    colonne_output = [f"{col}_{msg}" for col in nomi_campi]
+    return pd.DataFrame.from_records(records, columns=colonne_output)

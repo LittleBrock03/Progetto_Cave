@@ -1,0 +1,108 @@
+{
+  "default_report": "docana_magazzino",
+  "datasets": {
+    "docana_magazzino": {
+      "sources": {
+        "docana": {
+          "file": "docana.DBF",
+          "suffix": "",
+          "columns": [
+            "CODICE",
+            "DESCRIZION",
+            "CAUMAG",
+            "CAUCONT",
+            "CONTATORE",
+            "TIPO"
+          ]
+        },
+        "magcau": {
+          "file": "magcau.DBF",
+          "suffix": "magcau",
+          "columns": [
+            "CODICE",
+            "MAGPCOD"
+          ]
+        },
+        "magana": {
+          "file": "magana.DBF",
+          "suffix": "magana",
+          "columns": [
+            "CODICE",
+            "DESCRIZION"
+          ]
+        }
+      },
+      "base_source": "docana",
+      "joins": [
+        {
+          "source": "magcau",
+          "left_on": "CAUMAG_",
+          "right_on": "CODICE_magcau",
+          "how": "left"
+        },
+        {
+          "source": "magana",
+          "left_on": "MAGPCOD_magcau",
+          "right_on": "CODICE_magana",
+          "how": "left"
+        }
+      ],
+      "keep_columns": [
+        "CODICE_",
+        "DESCRIZION_",
+        "CAUMAG_",
+        "CAUCONT_",
+        "CONTATORE_",
+        "TIPO_",
+        "MAGPCOD_magcau",
+        "DESCRIZION_magana"
+      ],
+      "rename_columns": {
+        "CODICE_": "codice",
+        "DESCRIZION_": "descrizione",
+        "CAUMAG_": "causale magazzino",
+        "CAUCONT_": "causale contabile",
+        "CONTATORE_": "contatore",
+        "TIPO_": "tipo",
+        "MAGPCOD_magcau": "codice magazzino partenza",
+        "DESCRIZION_magana": "descrizione magana"
+      },
+      "calculated_fields": []
+    }
+  },
+  "reports": {
+    "docana_magazzino": {
+      "dataset": "docana_magazzino",
+      "output_file": "Tipo_Documento.xlsx",
+      "main_sheet": "Docana",
+      "freeze_panes": "A2",
+      "group_by": [],
+      "columns": [
+        "codice",
+        "descrizione",
+        "causale magazzino",
+        "causale contabile",
+        "contatore",
+        "tipo",
+        "codice magazzino partenza",
+        "descrizione magana"
+      ],
+      "column_widths": {
+        "codice": 12,
+        "descrizione": 32,
+        "causale magazzino": 20,
+        "causale contabile": 20,
+        "contatore": 14,
+        "tipo": 10,
+        "codice magazzino partenza": 26,
+        "descrizione magana": 36
+      },
+      "wrap_columns": [
+        "descrizione",
+        "descrizione magana"
+      ],
+      "number_formats": {},
+      "summaries": []
+    }
+  }
+}

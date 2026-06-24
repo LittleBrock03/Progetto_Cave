@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 from pathlib import Path
 import sys
 
@@ -13,7 +14,7 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-EXPORT_DIR = BASE_DIR / "export"
+EXPORT_DIR = Path(os.environ.get("PROGETTO_CAVE_EXPORT_DIR", BASE_DIR / "export"))
 EXPORT_PATH = EXPORT_DIR / "report.xlsx"
 
 
