@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -128,11 +129,26 @@ def _formatta_excel(percorso, df, config_report):
     wb = load_workbook(percorso)
     _formatta_foglio_principale(wb.active, config_report)
 
+    for extra_sheet in config_report.get("extra_sheets", []):
+        _scrivi_foglio_dataframe(wb, extra_sheet["df"], extra_sheet["config"])
+
     for index, summary_config in enumerate(config_report.get("summaries", []), start=1):
         _scrivi_riepilogo(wb, df, summary_config, index)
 
     wb.active = wb.sheetnames.index(config_report.get("main_sheet", "Report"))
     wb.save(percorso)
+
+
+def _scrivi_foglio_dataframe(wb, df, sheet_config):
+    sheet_name = sheet_config.get("main_sheet", sheet_config.get("name", "Foglio"))
+    if sheet_name in wb.sheetnames:
+        del wb[sheet_name]
+
+    ws = wb.create_sheet(sheet_name)
+    for row in dataframe_to_rows(df, index=False, header=True):
+        ws.append(row)
+
+    _formatta_foglio_principale(ws, sheet_config)
 
 
 def _percorso_export(config_report):

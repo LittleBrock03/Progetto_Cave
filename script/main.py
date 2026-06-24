@@ -20,13 +20,14 @@ else:
 CONFIG_DIR = BASE_DIR / "config"
 ESEMPI_DIR = BASE_DIR / "esempi"
 RETE_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
+DEFAULT_CONFIG_PATH = CONFIG_DIR / "report_config.json"
 
 
 def base_dbf_dir(sorgente):
     return RETE_DIR if sorgente == "rete" else ESEMPI_DIR
 
 
-def verifica_percorsi(sorgente, dataset_config):
+def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH):
     base_dir = base_dbf_dir(sorgente)
     dbf_files = {
         source_config["file"]
@@ -37,7 +38,7 @@ def verifica_percorsi(sorgente, dataset_config):
         for file_name in sorted(dbf_files)
         if not (base_dir / file_name).exists()
     ]
-    config_da_verificare = [CONFIG_DIR / "report_config.json"]
+    config_da_verificare = [config_path]
     if "Cava" in set(dataset_config.get("calculated_fields", [])):
         config_da_verificare.append(CONFIG_DIR / "config_cava.txt")
 
@@ -54,6 +55,12 @@ def verifica_percorsi(sorgente, dataset_config):
 
     print(f"Sorgente DBF: {base_dir}")
     print(f"Config progetto: {CONFIG_DIR}")
+
+
+def verifica_percorsi_report(sorgente, config_report, config_path=DEFAULT_CONFIG_PATH):
+    verifica_percorsi(sorgente, config_report["dataset_config"], config_path)
+    for extra_sheet in config_report.get("extra_sheets", []):
+        verifica_percorsi(sorgente, extra_sheet["dataset_config"], config_path)
 
 
 def valida_data(stringa_input):
@@ -258,6 +265,22 @@ def prepara_config_periodo(config_report, menno):
     return config_periodo
 
 
+def prepara_df_report(menno, sorgente, config_report):
+    df_base = prepara_base_dati(menno, sorgente, config_report["dataset_config"])
+    return applica_config_report(df_base, config_report)
+
+
+def prepara_fogli_extra(menno, sorgente, config_report_base):
+    fogli_extra = []
+    for extra_sheet_base in config_report_base.get("extra_sheets", []):
+        extra_sheet_config = prepara_config_periodo(extra_sheet_base, menno)
+        fogli_extra.append({
+            "df": prepara_df_report(menno, sorgente, extra_sheet_config),
+            "config": extra_sheet_config,
+        })
+    return fogli_extra
+
+
 def periodo_intervallo(periodi):
     data_inizio = min(periodo[1] for periodo in periodi)
     data_fine = max(periodo[2] for periodo in periodi)
@@ -265,28 +288,37 @@ def periodo_intervallo(periodi):
     return "__RANGE__", data_inizio, data_fine
 
 
-def esegui_periodo(menno, nome_report=None, sorgente="rete"):
-    config_report = report_config.carica(CONFIG_DIR / "report_config.json", nome_report)
+def esegui_periodo(menno, nome_report=None, sorgente="rete", config_path=DEFAULT_CONFIG_PATH):
+    config_report = report_config.carica(config_path, nome_report)
     config_report = prepara_config_periodo(config_report, menno)
-    df_base = prepara_base_dati(menno, sorgente, config_report["dataset_config"])
-    df_report = applica_config_report(df_base, config_report)
+    df_report = prepara_df_report(menno, sorgente, config_report)
+    config_report["extra_sheets"] = prepara_fogli_extra(menno, sorgente, config_report)
     return df_report, config_report
 
 
-def esegui_tutto(nome_report=None, sorgente="rete", numero_mesi=3):
+def esegui_tutto(nome_report=None, sorgente="rete", numero_mesi=3, config_path=DEFAULT_CONFIG_PATH):
     risultati = []
+    config_report_base = report_config.carica(config_path, nome_report)
+    dataset_config = config_report_base["dataset_config"]
+
+    if "Younth" not in set(dataset_config.get("calculated_fields", [])):
+        menno = ("", date.today(), date.today())
+        config_report = prepara_config_periodo(config_report_base, menno)
+        df_report = prepara_df_report(menno, sorgente, config_report)
+        config_report["extra_sheets"] = prepara_fogli_extra(menno, sorgente, config_report_base)
+        return [(df_report, config_report)]
+
     periodi = periodi_da_elaborare(numero_mesi)
     if not periodi:
         return risultati
 
-    config_report_base = report_config.carica(CONFIG_DIR / "report_config.json", nome_report)
-    dataset_config = config_report_base["dataset_config"]
     df_base = prepara_base_dati(periodo_intervallo(periodi), sorgente, dataset_config)
 
     for menno in periodi:
         config_report = prepara_config_periodo(config_report_base, menno)
         df_periodo = df_base[df_base["Younth"].eq(menno[0])].copy()
         df_report = applica_config_report(df_periodo, config_report)
+        config_report["extra_sheets"] = prepara_fogli_extra(menno, sorgente, config_report_base)
         risultati.append((df_report, config_report))
     return risultati
 
@@ -308,17 +340,26 @@ if __name__ == "__main__":
             help="Numero di mesi da generare, includendo il mese corrente.",
         )
         parser.add_argument(
+            "--config",
+            default=str(DEFAULT_CONFIG_PATH),
+            help="Percorso del file JSON di configurazione report.",
+        )
+        parser.add_argument(
             "--no-open",
             action="store_true",
             help="Non apre Excel al termine. Utile per esecuzione pianificata.",
         )
         args = parser.parse_args()
 
-        config_verifica = report_config.carica(CONFIG_DIR / "report_config.json", args.report)
-        verifica_percorsi(args.source, config_verifica["dataset_config"])
+        config_path = Path(args.config)
+        if not config_path.is_absolute():
+            config_path = BASE_DIR / config_path
+
+        config_verifica = report_config.carica(config_path, args.report)
+        verifica_percorsi_report(args.source, config_verifica, config_path)
 
         percorsi_creati = []
-        for df, config_report in esegui_tutto(args.report, args.source, args.months):
+        for df, config_report in esegui_tutto(args.report, args.source, args.months, config_path):
             print("Esportazione del file Excel in corso...")
             percorso = df_to_excel.esegui(df, config_report)
             percorsi_creati.append(percorso)
