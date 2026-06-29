@@ -3,7 +3,8 @@ import os
 from pathlib import Path
 import sys
 
-from openpyxl import load_workbook
+from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -18,8 +19,31 @@ EXPORT_DIR = Path(os.environ.get("PROGETTO_CAVE_EXPORT_DIR", BASE_DIR / "export"
 EXPORT_PATH = EXPORT_DIR / "report.xlsx"
 
 
+def _pulisci_valore_excel(valore):
+    if isinstance(valore, str):
+        return ILLEGAL_CHARACTERS_RE.sub("", valore)
+    return valore
+
+
+def _pulisci_dataframe_excel(df):
+    df_pulito = df.copy()
+    for colonna in df_pulito.select_dtypes(include=["object", "string"]).columns:
+        df_pulito[colonna] = df_pulito[colonna].map(_pulisci_valore_excel)
+    return df_pulito
+
+
 def _normalizza_nome_colonna(nome):
     return str(nome).replace("_", " ").title()
+
+
+def _scrivi_riga_su_foglio(ws, valori):
+    valori = list(valori)
+    ws.append(valori)
+    indice_riga = ws._current_row
+
+    for indice_colonna, valore in enumerate(valori, start=1):
+        if isinstance(valore, str) and valore.startswith("="):
+            ws.cell(indice_riga, indice_colonna).data_type = "s"
 
 
 def _stile_intestazione(ws):
@@ -54,6 +78,18 @@ def _formatta_foglio_principale(ws, config_report):
         cell.value = _normalizza_nome_colonna(nome_originale)
 
     _stile_intestazione(ws)
+    if config_report.get("fast_format"):
+        for colonna, formato in number_formats.items():
+            col_index = original_headers.get(colonna)
+            if not col_index:
+                continue
+            for row in ws.iter_rows(
+                min_row=2,
+                min_col=col_index,
+                max_col=col_index,
+            ):
+                row[0].number_format = formato
+        return
 
     for row in ws.iter_rows(min_row=2):
         if row[0].row % 2 == 0:
@@ -103,10 +139,16 @@ def _scrivi_riepilogo(wb, df, summary_config, index):
     ws = wb.create_sheet(sheet_name)
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = "A2"
-    ws.append([_normalizza_nome_colonna(colonna) for colonna in colonne])
+    _scrivi_riga_su_foglio(
+        ws,
+        [_normalizza_nome_colonna(colonna) for colonna in colonne],
+    )
 
     for _, row in riepilogo[colonne].iterrows():
-        ws.append(row.tolist())
+        _scrivi_riga_su_foglio(
+            ws,
+            [_pulisci_valore_excel(valore) for valore in row.tolist()],
+        )
 
     _stile_intestazione(ws)
     thin_border = Border(bottom=Side(style="thin", color="D7DEDA"))
@@ -126,9 +168,16 @@ def _scrivi_riepilogo(wb, df, summary_config, index):
                 row[posizione].number_format = formato
 
 
-def _formatta_excel(percorso, df, config_report):
-    wb = load_workbook(percorso)
-    _formatta_foglio_principale(wb.active, config_report)
+def _scrivi_dataframe_su_foglio(ws, df):
+    for row in dataframe_to_rows(df, index=False, header=True):
+        _scrivi_riga_su_foglio(ws, row)
+
+
+def _salva_excel(percorso, df, config_report):
+    wb = Workbook()
+    ws = wb.active
+    _scrivi_dataframe_su_foglio(ws, df)
+    _formatta_foglio_principale(ws, config_report)
 
     for extra_sheet in config_report.get("extra_sheets", []):
         _scrivi_foglio_dataframe(wb, extra_sheet["df"], extra_sheet["config"])
@@ -146,8 +195,8 @@ def _scrivi_foglio_dataframe(wb, df, sheet_config):
         del wb[sheet_name]
 
     ws = wb.create_sheet(sheet_name)
-    for row in dataframe_to_rows(df, index=False, header=True):
-        ws.append(row)
+    df = _pulisci_dataframe_excel(df)
+    _scrivi_dataframe_su_foglio(ws, df)
 
     _formatta_foglio_principale(ws, sheet_config)
 
@@ -160,19 +209,18 @@ def _percorso_export(config_report):
 
 def esegui(df, config_report=None):
     config_report = config_report or {}
+    df = _pulisci_dataframe_excel(df)
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
     percorso_base = _percorso_export(config_report)
 
     try:
         percorso = percorso_base
-        df.to_excel(percorso, index=False)
-        _formatta_excel(percorso, df, config_report)
+        _salva_excel(percorso, df, config_report)
     except PermissionError:
         percorso = percorso_base.with_name(
             f"{percorso_base.stem}_{datetime.now():%Y%m%d_%H%M%S}{percorso_base.suffix}"
         )
-        df.to_excel(percorso, index=False)
-        _formatta_excel(percorso, df, config_report)
+        _salva_excel(percorso, df, config_report)
         print(f"Report principale bloccato. Creata una copia: {percorso}")
         return percorso
 

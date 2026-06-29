@@ -1,0 +1,323 @@
+{
+  "default_report": "schede_contabili",
+  "datasets": {
+    "schede_contabili": {
+      "sources": {
+        "schede_contabili": {
+          "file": "righe.DBF",
+          "suffix": "",
+          "columns": [
+            "ID",
+            "ID_TESTA",
+            "CODICECF",
+            "CODCONTO",
+            "NOTE",
+            "CAUSALE",
+            "DATAREG",
+            "DATACOMP",
+            "DAREFLAG",
+            "NUMRIGA",
+            "IMPORTOLIT"
+          ],
+          "row_filter": {
+            "any": [
+              {
+                "all": [
+                  {
+                    "column": "CODCONTO",
+                    "operator": "ge",
+                    "value": "02402905050"
+                  },
+                  {
+                    "column": "CODCONTO",
+                    "operator": "le",
+                    "value": "02402905570"
+                  }
+                ]
+              },
+              {
+                "column": "CODCONTO",
+                "operator": "starts_with",
+                "value": "01301810"
+              },
+              {
+                "column": "CODCONTO",
+                "operator": "eq",
+                "value": "01301830050"
+              }
+            ]
+          }
+        },
+        "contabilita_teste": {
+          "file": "teste.DBF",
+          "suffix": "teste",
+          "columns": [
+            "ID",
+            "DESCRIZION"
+          ],
+          "filter_in": {
+            "column": "ID",
+            "source": "schede_contabili",
+            "source_column": "ID_TESTA"
+          }
+        },
+        "anagrafe": {
+          "file": "anagrafe.DBF",
+          "suffix": "anagrafe",
+          "columns": [
+            "CODICE"
+          ],
+          "filter_in": {
+            "column": "CODICE",
+            "source": "schede_contabili",
+            "source_column": "CODICECF"
+          }
+        },
+        "contabilita_causali": {
+          "file": "causali.DBF",
+          "suffix": "causali",
+          "columns": [
+            "CODICE",
+            "DESCRIZION"
+          ],
+          "filter_in": {
+            "column": "CODICE",
+            "source": "schede_contabili",
+            "source_column": "CAUSALE"
+          }
+        },
+        "conti": {
+          "file": "CONTI.DBF",
+          "suffix": "conti",
+          "columns": [
+            "CODICE",
+            "DESCRIZION"
+          ],
+          "filter_in": {
+            "column": "CODICE",
+            "source": "schede_contabili",
+            "source_column": "CODCONTO"
+          }
+        }
+      },
+      "base_source": "schede_contabili",
+      "joins": [
+        {
+          "source": "contabilita_teste",
+          "left_on": "ID_TESTA_",
+          "right_on": "ID_teste",
+          "how": "inner"
+        },
+        {
+          "source": "contabilita_causali",
+          "left_on": "CAUSALE_",
+          "right_on": "CODICE_causali",
+          "how": "left"
+        },
+        {
+          "source": "anagrafe",
+          "left_on": "CODICECF_",
+          "right_on": "CODICE_anagrafe",
+          "how": "left"
+        },
+        {
+          "source": "conti",
+          "left_on": "CODCONTO_",
+          "right_on": "CODICE_conti",
+          "how": "left"
+        }
+      ],
+      "keep_columns": [
+        "ID_",
+        "ID_TESTA_",
+        "CODICECF_",
+        "CODCONTO_",
+        "ID_teste",
+        "DESCRIZION_teste",
+        "NOTE_",
+        "CAUSALE_",
+        "DATAREG_",
+        "DATACOMP_",
+        "DAREFLAG_",
+        "NUMRIGA_",
+        "IMPORTOLIT_",
+        "CODICE_causali",
+        "DESCRIZION_causali",
+        "CODICE_anagrafe",
+        "CODICE_conti",
+        "DESCRIZION_conti",
+        "CODICE_conti1",
+        "CODICE_conti2",
+        "CODICE_conti3",
+        "CODICE_conti4"
+      ],
+      "rename_columns": {
+        "ID_": "id_schede_contabili",
+        "ID_TESTA_": "id_testa_schede_contabili",
+        "CODICECF_": "codicecf_schede_contabili",
+        "CODCONTO_": "codconto",
+        "ID_teste": "id_contabilita_teste",
+        "DESCRIZION_teste": "Descrizione",
+        "NOTE_": "Note riga",
+        "CAUSALE_": "causale_contabile_righe",
+        "DATAREG_": "Data Reg.",
+        "DATACOMP_": "Data Comp.",
+        "DAREFLAG_": "Dare\\Avere",
+        "NUMRIGA_": "Nr. Riga",
+        "IMPORTOLIT_": "importo_contabile",
+        "CODICE_causali": "Cod.Causali",
+        "DESCRIZION_causali": "Causale",
+        "CODICE_anagrafe": "codice_anagrafe",
+        "CODICE_conti": "codice_conti",
+        "DESCRIZION_conti": "Conto",
+        "CODICE_conti1": "codice_conti1",
+        "CODICE_conti2": "codice_conti2",
+        "CODICE_conti3": "codice_conti3",
+        "CODICE_conti4": "codice_conti4"
+      },
+      "copy_columns": {
+        "id_schede_contabili": "id_contabilita_righe"
+      },
+      "derived_columns": {
+        "codice_conti1": {
+          "source": "codice_conti",
+          "left": 2,
+          "suffix": "00000000"
+        },
+        "codice_conti2": {
+          "source": "codice_conti",
+          "left": 4,
+          "suffix": "000000"
+        },
+        "codice_conti3": {
+          "source": "codice_conti",
+          "left": 6,
+          "suffix": "0000"
+        },
+        "codice_conti4": {
+          "source": "codice_conti",
+          "left": 8,
+          "suffix": "00"
+        },
+        "Dare": {
+          "operation": "conditional",
+          "source": "importo_contabile",
+          "when": {
+            "column": "Dare\\Avere",
+            "equals": "D"
+          },
+          "otherwise": 0,
+          "fillna": 0
+        },
+        "Avere": {
+          "operation": "conditional",
+          "source": "importo_contabile",
+          "when": {
+            "column": "Dare\\Avere",
+            "equals": "A"
+          },
+          "otherwise": 0,
+          "fillna": 0
+        },
+        "Differenza": {
+          "operation": "subtract",
+          "left": "Avere",
+          "right": "Dare"
+        }
+      },
+      "calculated_fields": []
+    }
+  },
+  "reports": {
+    "schede_contabili": {
+      "dataset": "schede_contabili",
+      "output_file": "schede_contabili.xlsx",
+      "main_sheet": "Schede",
+      "freeze_panes": "A2",
+      "fast_format": true,
+      "include_rows": [
+        {
+          "any": [
+            {
+              "all": [
+                {
+                  "column": "codconto",
+                  "operator": "ge",
+                  "value": "02402905050"
+                },
+                {
+                  "column": "codconto",
+                  "operator": "le",
+                  "value": "02402905570"
+                }
+              ]
+            },
+            {
+              "column": "codconto",
+              "operator": "starts_with",
+              "value": "01301810"
+            },
+            {
+              "column": "codconto",
+              "operator": "eq",
+              "value": "01301830050"
+            }
+          ]
+        }
+      ],
+      "group_by": [],
+      "columns": [
+        "Conto",
+        "Data Reg.",
+        "Data Comp.",
+        "Nr. Riga",
+        "Cod.Causali",
+        "Causale",
+        "Descrizione",
+        "Note riga",
+        "Dare",
+        "Avere",
+        "Differenza"
+      ],
+      "column_widths": {
+        "id_schede_contabili": 18,
+        "id_contabilita_righe": 18,
+        "id_testa_schede_contabili": 22,
+        "Data Reg.": 14,
+        "Data Comp.": 14,
+        "Dare\\Avere": 12,
+        "Nr. Riga": 12,
+        "Dare": 18,
+        "Avere": 18,
+        "Differenza": 18,
+        "codicecf_schede_contabili": 24,
+        "codconto": 18,
+        "id_contabilita_teste": 20,
+        "Descrizione": 42,
+        "Note riga": 54,
+        "causale_contabile_righe": 20,
+        "Cod.Causali": 18,
+        "Causale": 36,
+        "codice_anagrafe": 18,
+        "codice_conti": 18,
+        "Conto": 42,
+        "codice_conti1": 18,
+        "codice_conti2": 18,
+        "codice_conti3": 18,
+        "codice_conti4": 18
+      },
+      "wrap_columns": [
+        "Descrizione",
+        "Note riga",
+        "Causale",
+        "Conto"
+      ],
+      "number_formats": {
+        "Dare": "#,##0.00",
+        "Avere": "#,##0.00",
+        "Differenza": "#,##0.00"
+      },
+      "summaries": []
+    }
+  }
+}

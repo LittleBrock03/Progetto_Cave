@@ -20,6 +20,7 @@ else:
 CONFIG_DIR = BASE_DIR / "config"
 ESEMPI_DIR = BASE_DIR / "esempi"
 RETE_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
+CBR_DIR = Path(r"\\172.16.2.13\arca\ditte\CBR")
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "report_config.json"
 
 
@@ -27,6 +28,8 @@ def base_dbf_dir(sorgente):
     dbf_dir = os.environ.get("PROGETTO_CAVE_DBF_DIR")
     if dbf_dir:
         return Path(dbf_dir)
+    if sorgente == "cbr":
+        return CBR_DIR
     return RETE_DIR if sorgente == "rete" else ESEMPI_DIR
 
 
@@ -126,6 +129,64 @@ def _applica_colonne_dataset(df, dataset_config):
     if rename_columns:
         df = df.rename(columns=rename_columns)
 
+    copy_columns = dataset_config.get("copy_columns", {})
+    for colonna_sorgente, colonna_destinazione in copy_columns.items():
+        if colonna_sorgente in df.columns and colonna_destinazione not in df.columns:
+            df[colonna_destinazione] = df[colonna_sorgente]
+
+    derived_columns = dataset_config.get("derived_columns", {})
+    for colonna_destinazione, regola in derived_columns.items():
+        operazione = regola.get("operation")
+
+        if operazione == "conditional":
+            colonna_sorgente = regola.get("source")
+            condizione = regola.get("when", {})
+            colonna_condizione = condizione.get("column")
+            if colonna_sorgente not in df.columns or colonna_condizione not in df.columns:
+                continue
+
+            valori_condizione = (
+                df[colonna_condizione]
+                .astype("string")
+                .fillna("")
+                .str.strip()
+            )
+            valore_atteso = str(condizione.get("equals", "")).strip()
+            risultato = df[colonna_sorgente].where(
+                valori_condizione.eq(valore_atteso),
+                regola.get("otherwise", 0),
+            )
+            if "fillna" in regola:
+                risultato = risultato.fillna(regola["fillna"])
+            df[colonna_destinazione] = risultato
+            continue
+
+        if operazione == "subtract":
+            colonna_sinistra = regola.get("left")
+            colonna_destra = regola.get("right")
+            if colonna_sinistra not in df.columns or colonna_destra not in df.columns:
+                continue
+
+            sinistra = pd.to_numeric(df[colonna_sinistra], errors="coerce").fillna(0)
+            destra = pd.to_numeric(df[colonna_destra], errors="coerce").fillna(0)
+            df[colonna_destinazione] = sinistra - destra
+            continue
+
+        colonna_sorgente = regola.get("source")
+        if colonna_sorgente not in df.columns:
+            continue
+
+        valore = df[colonna_sorgente].astype("string").fillna("").str.strip()
+        if "left" in regola:
+            valore = valore.str[:regola["left"]]
+        if "right" in regola:
+            valore = valore.str[-regola["right"]:]
+        if "prefix" in regola:
+            valore = regola["prefix"] + valore
+        if "suffix" in regola:
+            valore = valore + regola["suffix"]
+        df[colonna_destinazione] = valore.mask(df[colonna_sorgente].isna(), "")
+
     return df
 
 
@@ -207,6 +268,16 @@ def _condizione_report(df, regola):
             return numeri.eq(valore)
         if operatore == "ne":
             return numeri.ne(valore)
+        if operatore == "ge":
+            return numeri.ge(valore)
+        if operatore == "le":
+            return numeri.le(valore)
+        if operatore == "gt":
+            return numeri.gt(valore)
+        if operatore == "lt":
+            return numeri.lt(valore)
+        if operatore == "between":
+            return numeri.between(regola["min"], regola["max"], inclusive="both")
 
     testo = serie.astype("string").str.strip()
     valore_testo = str(valore).strip()
@@ -214,21 +285,49 @@ def _condizione_report(df, regola):
         return testo.eq(valore_testo)
     if operatore == "ne":
         return testo.ne(valore_testo)
+    if operatore == "ge":
+        return testo.ge(valore_testo)
+    if operatore == "le":
+        return testo.le(valore_testo)
+    if operatore == "gt":
+        return testo.gt(valore_testo)
+    if operatore == "lt":
+        return testo.lt(valore_testo)
+    if operatore == "between":
+        return testo.ge(str(regola["min"]).strip()) & testo.le(str(regola["max"]).strip())
+    if operatore == "starts_with":
+        return testo.str.startswith(valore_testo, na=False)
+    if operatore == "in":
+        valori = [str(item).strip() for item in regola.get("values", [])]
+        return testo.isin(valori)
 
     raise ValueError(f"Operatore filtro report non supportato: {operatore}")
 
 
+def _maschera_report(df, gruppo):
+    if "all" in gruppo:
+        maschera = pd.Series(True, index=df.index)
+        for regola in gruppo.get("all", []):
+            maschera &= _maschera_report(df, regola)
+        return maschera
+
+    if "any" in gruppo:
+        maschera = pd.Series(False, index=df.index)
+        for regola in gruppo.get("any", []):
+            maschera |= _maschera_report(df, regola)
+        return maschera
+
+    return _condizione_report(df, gruppo)
+
+
 def applica_filtri_report(df, config_report):
     df_filtrato = df
+    for filtro in config_report.get("include_rows", []):
+        maschera = _maschera_report(df_filtrato, filtro)
+        df_filtrato = df_filtrato.loc[maschera].copy()
+
     for filtro in config_report.get("drop_rows", []):
-        condizioni = filtro.get("all", [])
-        if not condizioni:
-            continue
-
-        maschera = pd.Series(True, index=df_filtrato.index)
-        for regola in condizioni:
-            maschera &= _condizione_report(df_filtrato, regola)
-
+        maschera = _maschera_report(df_filtrato, filtro)
         df_filtrato = df_filtrato.loc[~maschera].copy()
 
     return df_filtrato
@@ -332,9 +431,9 @@ if __name__ == "__main__":
         parser.add_argument("--report", help="Nome report definito in config/report_config.json")
         parser.add_argument(
             "--source",
-            choices=["rete", "esempi"],
+            choices=["rete", "cbr", "esempi"],
             default="rete",
-            help="Sorgente DBF. In produzione usa rete: i DBF sono nella cartella ICR; i config restano nel progetto.",
+            help="Sorgente DBF. Usa rete per ICR, cbr per CBR, esempi per DBF locali.",
         )
         parser.add_argument(
             "--months",
