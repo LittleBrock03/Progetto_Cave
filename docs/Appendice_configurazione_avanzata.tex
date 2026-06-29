@@ -1,0 +1,1068 @@
+% Appendice aggiornata al 29/06/2026.
+% Il documento principale deve caricare almeno il pacchetto listings:
+% \usepackage{listings}
+
+\section{Configurazione avanzata e report di contabilita}
+\label{sec:configurazione-avanzata}
+
+Questa sezione descrive le estensioni introdotte nel generatore di report e
+spiega come configurare nuovi dataset e nuovi report senza modificare il
+codice Python. Le funzionalita qui descritte sono compatibili con i file di
+configurazione precedenti: una proprieta nuova viene applicata solamente
+quando e presente nel file JSON.
+
+\subsection{Riepilogo delle funzionalita aggiunte}
+
+Le principali estensioni sono:
+
+\begin{itemize}
+  \item selezione esplicita della sorgente DBF ICR, CBR oppure locale;
+  \item caricamento di un file di configurazione diverso da quello standard;
+  \item filtri applicati direttamente durante la lettura dei DBF;
+  \item filtri logici annidati mediante i gruppi \texttt{any} e \texttt{all};
+  \item filtro di una sorgente in base ai valori gia letti da un'altra sorgente;
+  \item trasformazione delle chiavi di join;
+  \item copia di colonne gia esistenti;
+  \item creazione di colonne derivate mediante prefissi, suffissi e
+        selezione parziale del testo;
+  \item creazione di colonne condizionali;
+  \item sottrazione tra colonne numeriche;
+  \item protezione dei testi che iniziano con il carattere \texttt{=},
+        affinche Excel non li interpreti come formule;
+  \item modalita di formattazione veloce per report con molte righe;
+  \item generazione del report contabile con le colonne Dare, Avere e
+        Differenza;
+  \item distribuzione del programma tramite eseguibile e file batch.
+\end{itemize}
+
+\subsection{Avvio del programma}
+
+Il programma si avvia dalla cartella principale del progetto con il comando:
+
+\begin{lstlisting}[language=bash]
+python .\script\main.py [opzioni]
+\end{lstlisting}
+
+Le opzioni disponibili sono le seguenti.
+
+\begin{description}
+  \item[\texttt{--config PERCORSO}]
+  Indica il file JSON da utilizzare. Se non viene specificato, il programma
+  usa \texttt{config/report\_config.json}.
+
+  \item[\texttt{--report NOME}]
+  Seleziona uno dei report presenti nell'oggetto \texttt{reports}. Se viene
+  omesso, viene usato il valore di \texttt{default\_report}.
+
+  \item[\texttt{--source icr}]
+  Usa la sorgente ICR predefinita:
+  \texttt{\textbackslash\textbackslash172.16.2.13\textbackslash arca\textbackslash ditte\textbackslash ICR}.
+
+  \item[\texttt{--source cbr}]
+  Usa la sorgente CBR predefinita:
+  \texttt{\textbackslash\textbackslash172.16.2.13\textbackslash arca\textbackslash ditte\textbackslash CBR}.
+
+  \item[\texttt{--source esempi}]
+  Usa la cartella locale \texttt{esempi}. Questa opzione e utile per prove
+  che non devono leggere la rete.
+
+  \item[\texttt{--months N}]
+  Indica quanti mesi elaborare per i report mensili. Il valore predefinito e
+  3. L'opzione ha effetto sui dataset che calcolano il campo \texttt{Younth}.
+
+  \item[\texttt{--no-open}]
+  Genera il file Excel senza aprirlo automaticamente. Questa opzione e
+  consigliata nei file batch e nelle esecuzioni pianificate.
+\end{description}
+
+Esempio di esecuzione del report contabile CBR:
+
+\begin{lstlisting}[language=bash]
+python .\script\main.py ^
+  --config .\config\contabilita_config.json ^
+  --source cbr ^
+  --no-open
+\end{lstlisting}
+
+\subsubsection{Variabili di ambiente}
+
+Due variabili di ambiente permettono di sostituire i percorsi definiti dal
+programma:
+
+\begin{description}
+  \item[\texttt{PROGETTO\_CAVE\_DBF\_DIR}]
+  Percorso della cartella che contiene i DBF. Se presente, ha precedenza
+  sull'opzione \texttt{--source}.
+
+  \item[\texttt{PROGETTO\_CAVE\_EXPORT\_DIR}]
+  Cartella nella quale vengono salvati i file Excel.
+\end{description}
+
+Esempio PowerShell:
+
+\begin{lstlisting}[language=bash]
+$env:PROGETTO_CAVE_DBF_DIR = "\\172.16.2.13\arca\ditte\CBR"
+$env:PROGETTO_CAVE_EXPORT_DIR = "C:\Report\Contabilita"
+python .\script\main.py --config .\config\contabilita_config.json --no-open
+\end{lstlisting}
+
+\subsection{Struttura generale del file JSON}
+
+Un file di configurazione contiene tre sezioni principali:
+
+\begin{lstlisting}
+{
+  "default_report": "nome_report",
+  "datasets": {
+    "nome_dataset": {
+      "...": "..."
+    }
+  },
+  "reports": {
+    "nome_report": {
+      "dataset": "nome_dataset",
+      "...": "..."
+    }
+  }
+}
+\end{lstlisting}
+
+\begin{description}
+  \item[\texttt{default\_report}]
+  Nome del report eseguito quando non viene passato \texttt{--report}.
+
+  \item[\texttt{datasets}]
+  Descrive come leggere i DBF, collegare le tabelle e preparare le colonne.
+
+  \item[\texttt{reports}]
+  Descrive quali righe e colonne esportare e come costruire il file Excel.
+\end{description}
+
+Uno stesso dataset puo essere riutilizzato da piu report. In questo modo i
+DBF e le join vengono definiti una sola volta, mentre ogni report puo avere
+filtri, aggregazioni e colonne differenti.
+
+\subsection{Definizione delle sorgenti DBF}
+
+Le sorgenti sono dichiarate nell'oggetto \texttt{sources}:
+
+\begin{lstlisting}
+"sources": {
+  "righe_contabili": {
+    "file": "righe.DBF",
+    "suffix": "",
+    "columns": [
+      "ID",
+      "ID_TESTA",
+      "CODCONTO",
+      "DATAREG",
+      "IMPORTOLIT"
+    ]
+  },
+  "teste_contabili": {
+    "file": "teste.DBF",
+    "suffix": "teste",
+    "columns": [
+      "ID",
+      "DESCRIZION"
+    ]
+  }
+}
+\end{lstlisting}
+
+\begin{description}
+  \item[\texttt{file}]
+  Nome del DBF all'interno della cartella sorgente.
+
+  \item[\texttt{columns}]
+  Elenco dei campi da leggere. E consigliabile includere solamente i campi
+  necessari, per ridurre memoria e tempo di elaborazione.
+
+  \item[\texttt{suffix}]
+  Suffisso aggiunto ai nomi dei campi per evitare collisioni tra tabelle.
+\end{description}
+
+Il nome prodotto da una sorgente segue la forma:
+
+\begin{lstlisting}
+NOME_CAMPO + "_" + suffix
+\end{lstlisting}
+
+Esempi:
+
+\begin{itemize}
+  \item \texttt{ID} con suffisso vuoto diventa \texttt{ID\_};
+  \item \texttt{ID} con suffisso \texttt{teste} diventa
+        \texttt{ID\_teste};
+  \item \texttt{DESCRIZION} con suffisso \texttt{conti} diventa
+        \texttt{DESCRIZION\_conti}.
+\end{itemize}
+
+Questi nomi completi devono essere usati nelle join e nella proprieta
+\texttt{keep\_columns}.
+
+\subsection{Filtri durante la lettura dei DBF}
+
+I filtri di sorgente vengono applicati prima di creare il DataFrame. Sono
+particolarmente importanti quando un DBF contiene centinaia di migliaia o
+milioni di record.
+
+\subsubsection{Filtro per data}
+
+\begin{lstlisting}
+"date_filter": {
+  "column": "DATADOC"
+}
+\end{lstlisting}
+
+Il valore del campo deve essere compreso tra la data iniziale e quella finale
+del periodo elaborato.
+
+\subsubsection{Filtro basato su un'altra sorgente}
+
+\begin{lstlisting}
+"filter_in": {
+  "column": "ID_TESTA",
+  "source": "doctes",
+  "source_column": "ID"
+}
+\end{lstlisting}
+
+Il record viene mantenuto solamente se \texttt{ID\_TESTA} appartiene
+all'insieme dei valori \texttt{ID} gia letti dalla sorgente \texttt{doctes}.
+
+\textbf{Importante:} le sorgenti sono lette nell'ordine in cui compaiono nel
+JSON. La sorgente indicata da \texttt{source} deve quindi essere dichiarata
+prima della sorgente che usa \texttt{filter\_in}.
+
+Questa tecnica riduce notevolmente il numero di righe caricate. Nel report
+contabile, ad esempio, vengono lette da \texttt{teste.DBF} solamente le teste
+richiamate dalle righe contabili selezionate.
+
+\subsubsection{Filtro logico \texttt{row\_filter}}
+
+Il filtro \texttt{row\_filter} lavora direttamente sui valori del record DBF.
+Puo contenere una condizione singola oppure gruppi annidati.
+
+Il gruppo \texttt{all} equivale all'operatore logico SQL \texttt{AND}:
+
+\begin{lstlisting}
+"all": [
+  {
+    "column": "CODCONTO",
+    "operator": "ge",
+    "value": "02402905050"
+  },
+  {
+    "column": "CODCONTO",
+    "operator": "le",
+    "value": "02402905570"
+  }
+]
+\end{lstlisting}
+
+Il gruppo \texttt{any} equivale all'operatore logico SQL \texttt{OR}:
+
+\begin{lstlisting}
+"any": [
+  {
+    "column": "CODCONTO",
+    "operator": "starts_with",
+    "value": "01301810"
+  },
+  {
+    "column": "CODCONTO",
+    "operator": "eq",
+    "value": "01301830050"
+  }
+]
+\end{lstlisting}
+
+I gruppi possono essere annidati. Il seguente esempio rappresenta la
+condizione SQL:
+
+\begin{lstlisting}[language=SQL]
+WHERE
+    (
+        CODCONTO >= '02402905050'
+        AND CODCONTO <= '02402905570'
+    )
+    OR CODCONTO LIKE '01301810%'
+    OR CODCONTO = '01301830050'
+\end{lstlisting}
+
+Configurazione equivalente:
+
+\begin{lstlisting}
+"row_filter": {
+  "any": [
+    {
+      "all": [
+        {
+          "column": "CODCONTO",
+          "operator": "ge",
+          "value": "02402905050"
+        },
+        {
+          "column": "CODCONTO",
+          "operator": "le",
+          "value": "02402905570"
+        }
+      ]
+    },
+    {
+      "column": "CODCONTO",
+      "operator": "starts_with",
+      "value": "01301810"
+    },
+    {
+      "column": "CODCONTO",
+      "operator": "eq",
+      "value": "01301830050"
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsubsection{Operatori disponibili}
+
+Gli operatori supportati dai filtri sono:
+
+\begin{description}
+  \item[\texttt{eq}] uguale;
+  \item[\texttt{ne}] diverso;
+  \item[\texttt{ge}] maggiore o uguale;
+  \item[\texttt{le}] minore o uguale;
+  \item[\texttt{gt}] maggiore;
+  \item[\texttt{lt}] minore;
+  \item[\texttt{between}] compreso tra \texttt{min} e \texttt{max}, estremi
+        inclusi;
+  \item[\texttt{starts\_with}] il testo inizia con il valore indicato;
+  \item[\texttt{in}] il valore appartiene all'elenco \texttt{values};
+  \item[\texttt{blank}] il campo e vuoto;
+  \item[\texttt{not\_blank}] il campo non e vuoto.
+\end{description}
+
+Esempio dell'operatore \texttt{between}:
+
+\begin{lstlisting}
+{
+  "column": "CODCONTO",
+  "operator": "between",
+  "min": "02402905050",
+  "max": "02402905570"
+}
+\end{lstlisting}
+
+Esempio dell'operatore \texttt{in}:
+
+\begin{lstlisting}
+{
+  "column": "CAUSALE",
+  "operator": "in",
+  "values": ["BA", "PF", "IF"]
+}
+\end{lstlisting}
+
+\textbf{Attenzione ai codici con zeri iniziali:} nei filtri di sorgente i
+valori vengono confrontati come testo ripulito dagli spazi. Codici conto,
+codici articolo e causali devono quindi essere scritti tra virgolette.
+
+\subsection{Sorgente principale e join}
+
+La proprieta \texttt{base\_source} sceglie la tabella dalla quale parte il
+dataset:
+
+\begin{lstlisting}
+"base_source": "schede_contabili"
+\end{lstlisting}
+
+Le altre sorgenti vengono collegate mediante \texttt{joins}:
+
+\begin{lstlisting}
+"joins": [
+  {
+    "source": "contabilita_teste",
+    "left_on": "ID_TESTA_",
+    "right_on": "ID_teste",
+    "how": "inner"
+  },
+  {
+    "source": "conti",
+    "left_on": "CODCONTO_",
+    "right_on": "CODICE_conti",
+    "how": "left"
+  }
+]
+\end{lstlisting}
+
+\begin{description}
+  \item[\texttt{source}]
+  Nome della sorgente da collegare.
+
+  \item[\texttt{left\_on}]
+  Colonna presente nel DataFrame costruito fino a quel momento.
+
+  \item[\texttt{right\_on}]
+  Colonna della sorgente indicata da \texttt{source}.
+
+  \item[\texttt{how}]
+  Tipo di join Pandas. I valori normalmente usati sono \texttt{inner} e
+  \texttt{left}. Se omesso, il valore predefinito e \texttt{left}.
+\end{description}
+
+\texttt{inner} elimina le righe prive di corrispondenza; \texttt{left}
+conserva tutte le righe del lato sinistro e lascia vuoti i campi non trovati.
+
+\subsubsection{Trasformazione delle chiavi di join}
+
+Una chiave puo essere trasformata prima della join mediante
+\texttt{left\_transform} o \texttt{right\_transform}.
+
+\begin{lstlisting}
+{
+  "source": "conti_livello_1",
+  "how": "left",
+  "left_transform": {
+    "column": "CODICE_conti",
+    "left": 2,
+    "suffix": "00000000"
+  },
+  "right_on": "CODICE_conti1"
+}
+\end{lstlisting}
+
+Le trasformazioni disponibili sono:
+
+\begin{description}
+  \item[\texttt{left}] mantiene i primi $N$ caratteri;
+  \item[\texttt{right}] mantiene gli ultimi $N$ caratteri;
+  \item[\texttt{prefix}] aggiunge testo all'inizio;
+  \item[\texttt{suffix}] aggiunge testo alla fine.
+\end{description}
+
+\subsection{Selezione e rinomina delle colonne}
+
+\subsubsection{\texttt{keep\_columns}}
+
+\texttt{keep\_columns} limita il dataset alle colonne necessarie:
+
+\begin{lstlisting}
+"keep_columns": [
+  "ID_",
+  "DATAREG_",
+  "DAREFLAG_",
+  "IMPORTOLIT_",
+  "DESCRIZION_conti"
+]
+\end{lstlisting}
+
+Questa operazione avviene dopo le join e prima delle rinomine. Una colonna non
+presente viene ignorata; e comunque preferibile correggere il nome per non
+nascondere errori di configurazione.
+
+\subsubsection{\texttt{rename\_columns}}
+
+\begin{lstlisting}
+"rename_columns": {
+  "DATAREG_": "Data Reg.",
+  "DAREFLAG_": "Dare\\Avere",
+  "IMPORTOLIT_": "importo_contabile",
+  "DESCRIZION_conti": "Conto"
+}
+\end{lstlisting}
+
+La chiave e il nome tecnico prima della rinomina; il valore e il nome usato
+nelle fasi successive.
+
+Nel JSON il carattere barra inversa deve essere raddoppiato. Per ottenere
+\texttt{Dare\textbackslash Avere} si scrive quindi:
+
+\begin{lstlisting}
+"Dare\\Avere"
+\end{lstlisting}
+
+\subsection{Copia e derivazione delle colonne}
+
+\subsubsection{Copia di una colonna}
+
+\begin{lstlisting}
+"copy_columns": {
+  "id_schede_contabili": "id_contabilita_righe"
+}
+\end{lstlisting}
+
+La chiave indica la colonna sorgente e il valore indica il nuovo nome. La
+copia viene eseguita solamente se la sorgente esiste e la destinazione non
+esiste gia.
+
+\subsubsection{Derivazioni testuali}
+
+\texttt{derived\_columns} permette di costruire nuove colonne senza scrivere
+codice Python.
+
+\begin{lstlisting}
+"derived_columns": {
+  "codice_conti1": {
+    "source": "codice_conti",
+    "left": 2,
+    "suffix": "00000000"
+  },
+  "codice_conti2": {
+    "source": "codice_conti",
+    "left": 4,
+    "suffix": "000000"
+  }
+}
+\end{lstlisting}
+
+Con \texttt{codice\_conti = "02402905350"} si ottiene:
+
+\begin{itemize}
+  \item \texttt{codice\_conti1 = "0200000000"};
+  \item \texttt{codice\_conti2 = "0240000000"}.
+\end{itemize}
+
+L'ordine delle trasformazioni e: \texttt{left}, \texttt{right},
+\texttt{prefix}, \texttt{suffix}. Se il valore sorgente e nullo, il risultato
+e una stringa vuota.
+
+\subsubsection{Colonna condizionale}
+
+L'operazione \texttt{conditional} copia il valore della sorgente solamente
+quando una condizione e verificata.
+
+\begin{lstlisting}
+"Dare": {
+  "operation": "conditional",
+  "source": "importo_contabile",
+  "when": {
+    "column": "Dare\\Avere",
+    "equals": "D"
+  },
+  "otherwise": 0,
+  "fillna": 0
+}
+\end{lstlisting}
+
+Significato delle proprieta:
+
+\begin{description}
+  \item[\texttt{operation}]
+  Deve valere \texttt{conditional}.
+
+  \item[\texttt{source}]
+  Colonna dalla quale copiare il valore.
+
+  \item[\texttt{when.column}]
+  Colonna da controllare.
+
+  \item[\texttt{when.equals}]
+  Valore atteso. Il confronto testuale ignora gli spazi iniziali e finali.
+
+  \item[\texttt{otherwise}]
+  Valore usato quando la condizione e falsa.
+
+  \item[\texttt{fillna}]
+  Valore usato quando il risultato e nullo. La proprieta e facoltativa.
+\end{description}
+
+Esempio per la colonna Avere:
+
+\begin{lstlisting}
+"Avere": {
+  "operation": "conditional",
+  "source": "importo_contabile",
+  "when": {
+    "column": "Dare\\Avere",
+    "equals": "A"
+  },
+  "otherwise": 0,
+  "fillna": 0
+}
+\end{lstlisting}
+
+\subsubsection{Sottrazione tra colonne}
+
+\begin{lstlisting}
+"Differenza": {
+  "operation": "subtract",
+  "left": "Avere",
+  "right": "Dare"
+}
+\end{lstlisting}
+
+Il calcolo eseguito e:
+
+\begin{lstlisting}
+Differenza = Avere - Dare
+\end{lstlisting}
+
+Entrambe le colonne vengono convertite in numeri. Valori vuoti o non
+convertibili vengono considerati zero.
+
+\textbf{Ordine delle derivazioni:} le colonne derivate sono costruite
+nell'ordine in cui sono dichiarate nel JSON. Nell'esempio contabile
+\texttt{Dare} e \texttt{Avere} devono comparire prima di
+\texttt{Differenza}.
+
+\subsection{Campi calcolati predefiniti}
+
+La proprieta \texttt{calculated\_fields} attiva i calcoli Python gia
+implementati:
+
+\begin{lstlisting}
+"calculated_fields": ["Younth", "Cava", "Val_tot"]
+\end{lstlisting}
+
+\begin{description}
+  \item[\texttt{Younth}]
+  Converte la data documento nel periodo mensile.
+
+  \item[\texttt{Cava}]
+  Determina la cava dal prefisso del codice articolo e dal file
+  \texttt{config/config\_cava.txt}.
+
+  \item[\texttt{Val\_tot}]
+  Calcola il valore totale della riga considerando prezzo, sconti, trasporto
+  e quantita.
+\end{description}
+
+Un dataset che non necessita di questi calcoli usa:
+
+\begin{lstlisting}
+"calculated_fields": []
+\end{lstlisting}
+
+\subsection{Configurazione del report}
+
+Ogni voce dell'oggetto \texttt{reports} punta a un dataset:
+
+\begin{lstlisting}
+"reports": {
+  "schede_contabili": {
+    "dataset": "schede_contabili",
+    "output_file": "schede_contabili.xlsx",
+    "main_sheet": "Schede"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{Filtri finali}
+
+\texttt{include\_rows} conserva le righe che soddisfano la condizione:
+
+\begin{lstlisting}
+"include_rows": [
+  {
+    "column": "codconto",
+    "operator": "starts_with",
+    "value": "01301810"
+  }
+]
+\end{lstlisting}
+
+\texttt{drop\_rows} elimina le righe che soddisfano la condizione:
+
+\begin{lstlisting}
+"drop_rows": [
+  {
+    "all": [
+      {
+        "column": "Codice_Articolo",
+        "operator": "blank"
+      },
+      {
+        "column": "Val_tot",
+        "operator": "eq",
+        "value": 0
+      }
+    ]
+  }
+]
+\end{lstlisting}
+
+Entrambe le proprieta supportano gli stessi gruppi \texttt{any}/\texttt{all}
+e gli stessi operatori descritti per \texttt{row\_filter}.
+
+La differenza e il momento di applicazione:
+
+\begin{itemize}
+  \item \texttt{row\_filter} agisce durante la lettura del DBF e riduce subito
+        il volume dei dati;
+  \item \texttt{include\_rows} e \texttt{drop\_rows} agiscono dopo join,
+        rinomine e colonne derivate.
+\end{itemize}
+
+Se sono presenti piu elementi in \texttt{include\_rows}, vengono applicati in
+sequenza: ogni elemento restringe ulteriormente il risultato. Lo stesso vale
+per \texttt{drop\_rows}.
+
+Nei filtri finali un valore JSON numerico, ad esempio \texttt{0}, attiva il
+confronto numerico. Un valore tra virgolette, ad esempio \texttt{"0"}, viene
+trattato come testo. Per codici con zeri iniziali si devono sempre usare le
+virgolette.
+
+\subsubsection{Raggruppamenti e aggregazioni}
+
+Un report di dettaglio non raggruppato usa:
+
+\begin{lstlisting}
+"group_by": []
+\end{lstlisting}
+
+Un report aggregato puo usare:
+
+\begin{lstlisting}
+"group_by": [
+  "Cava",
+  "tipo_documento"
+],
+"aggregations": {
+  "Quantita": "sum",
+  "Val_tot": "sum",
+  "Younth": "first"
+}
+\end{lstlisting}
+
+Le aggregazioni sono quelle supportate da Pandas, ad esempio \texttt{sum},
+\texttt{first}, \texttt{min}, \texttt{max}, \texttt{mean} e \texttt{count}.
+
+\subsubsection{Colonne e ordinamento}
+
+\texttt{columns} sceglie e ordina le colonne del foglio:
+
+\begin{lstlisting}
+"columns": [
+  "Conto",
+  "Data Reg.",
+  "Data Comp.",
+  "Nr. Riga",
+  "Cod.Causali",
+  "Causale",
+  "Descrizione",
+  "Note riga",
+  "Dare",
+  "Avere",
+  "Differenza"
+]
+\end{lstlisting}
+
+Una colonna indicata ma non presente viene ignorata. Durante lo sviluppo di
+un nuovo config e quindi necessario controllare le intestazioni generate,
+perche un errore di battitura non interrompe l'esecuzione.
+
+L'ordinamento puo essere definito con:
+
+\begin{lstlisting}
+"sort_by": [
+  "Data Reg.",
+  "Nr. Riga"
+]
+\end{lstlisting}
+
+Se \texttt{sort\_by} non e presente, il programma usa \texttt{group\_by}.
+
+\subsection{Formattazione Excel}
+
+Esempio:
+
+\begin{lstlisting}
+"output_file": "schede_contabili.xlsx",
+"main_sheet": "Schede",
+"freeze_panes": "A2",
+"column_widths": {
+  "Conto": 42,
+  "Data Reg.": 14,
+  "Dare": 18,
+  "Avere": 18,
+  "Differenza": 18
+},
+"wrap_columns": [
+  "Descrizione",
+  "Note riga"
+],
+"number_formats": {
+  "Dare": "#,##0.00",
+  "Avere": "#,##0.00",
+  "Differenza": "#,##0.00"
+}
+\end{lstlisting}
+
+\begin{description}
+  \item[\texttt{output\_file}]
+  Nome del file Excel. Nei report mensili puo contenere segnaposto, ad
+  esempio \texttt{report\_\{periodo\_file\}.xlsx}.
+
+  \item[\texttt{main\_sheet}]
+  Nome del foglio principale.
+
+  \item[\texttt{freeze\_panes}]
+  Cella usata per bloccare righe e colonne.
+
+  \item[\texttt{column\_widths}]
+  Larghezza delle colonne.
+
+  \item[\texttt{wrap\_columns}]
+  Colonne nelle quali il testo deve andare a capo.
+
+  \item[\texttt{number\_formats}]
+  Formati numerici Excel applicati ai valori.
+\end{description}
+
+\subsubsection{Modalita veloce}
+
+Per report molto grandi si puo aggiungere:
+
+\begin{lstlisting}
+"fast_format": true
+\end{lstlisting}
+
+La modalita veloce mantiene:
+
+\begin{itemize}
+  \item stile dell'intestazione;
+  \item larghezza delle colonne;
+  \item blocco dei riquadri;
+  \item formati numerici dichiarati in \texttt{number\_formats}.
+\end{itemize}
+
+Per ridurre il tempo e la memoria non applica invece a ogni cella i bordi,
+l'allineamento, le righe alternate e il ritorno a capo. E indicata per
+esportazioni come la contabilita, che contiene oltre 150.000 righe.
+
+\subsubsection{Protezione dalle formule involontarie}
+
+Un testo letto da un DBF puo iniziare con il carattere \texttt{=}. Excel e
+OpenPyXL potrebbero interpretarlo come una formula, anche quando si tratta di
+una nota o di dati non strutturati.
+
+Il writer forza ora questi valori al tipo testo. Ad esempio:
+
+\begin{lstlisting}
+=testo proveniente dal DBF
+\end{lstlisting}
+
+viene conservato integralmente e non produce piu il messaggio:
+
+\begin{lstlisting}
+Record rimossi: Formula dalla parte /xl/worksheets/sheet1.xml
+\end{lstlisting}
+
+La protezione si applica al foglio principale, ai fogli aggiuntivi e ai
+riepiloghi.
+
+\subsection{Riepiloghi e fogli aggiuntivi}
+
+\subsubsection{Riepilogo}
+
+\begin{lstlisting}
+"summaries": [
+  {
+    "sheet_name": "Riepilogo",
+    "group_by": [
+      "Cava",
+      "tipo_documento"
+    ],
+    "aggregations": {
+      "Quantita": "sum",
+      "Val_tot": "sum"
+    },
+    "number_formats": {
+      "Quantita": "#,##0.00",
+      "Val_tot": "#,##0.00"
+    }
+  }
+]
+\end{lstlisting}
+
+Ogni elemento crea un nuovo foglio nello stesso file Excel.
+
+\subsubsection{Foglio basato su un altro report}
+
+\begin{lstlisting}
+"extra_sheets": [
+  {
+    "report": "magalias",
+    "main_sheet": "Alias"
+  }
+]
+\end{lstlisting}
+
+Il report indicato deve essere presente nello stesso oggetto
+\texttt{reports}. Il programma ne carica il dataset e inserisce il risultato
+come foglio aggiuntivo.
+
+\subsection{Esempio contabile completo}
+
+Il report contabile parte da \texttt{righe.DBF} e collega:
+
+\begin{itemize}
+  \item \texttt{teste.DBF} tramite \texttt{ID\_TESTA = ID};
+  \item \texttt{causali.DBF} tramite \texttt{CAUSALE = CODICE};
+  \item \texttt{anagrafe.DBF} tramite \texttt{CODICECF = CODICE};
+  \item \texttt{CONTI.DBF} tramite \texttt{CODCONTO = CODICE}.
+\end{itemize}
+
+I campi principali letti da \texttt{righe.DBF} sono:
+
+\begin{lstlisting}
+"columns": [
+  "ID",
+  "ID_TESTA",
+  "CODICECF",
+  "CODCONTO",
+  "NOTE",
+  "CAUSALE",
+  "DATAREG",
+  "DATACOMP",
+  "DAREFLAG",
+  "NUMRIGA",
+  "IMPORTOLIT"
+]
+\end{lstlisting}
+
+\texttt{IMPORTOLIT} e l'importo nella valuta contabile di base.
+\texttt{DAREFLAG} stabilisce il lato della registrazione:
+
+\begin{itemize}
+  \item \texttt{D}: l'importo viene scritto nella colonna Dare;
+  \item \texttt{A}: l'importo viene scritto nella colonna Avere.
+\end{itemize}
+
+Le formule logiche sono:
+
+\begin{lstlisting}
+Dare       = IMPORTOLIT se DAREFLAG = "D", altrimenti 0
+Avere      = IMPORTOLIT se DAREFLAG = "A", altrimenti 0
+Differenza = Avere - Dare
+\end{lstlisting}
+
+Esempi:
+
+\begin{center}
+\begin{tabular}{lrrr}
+\hline
+\textbf{Flag e importo} & \textbf{Dare} & \textbf{Avere} &
+\textbf{Differenza} \\
+\hline
+D; 329.786,51 & 329.786,51 & 0,00 & -329.786,51 \\
+A; 33.729,59  & 0,00 & 33.729,59 & 33.729,59 \\
+D; valore vuoto & 0,00 & 0,00 & 0,00 \\
+\hline
+\end{tabular}
+\end{center}
+
+La prima riga e stata verificata con la registrazione di apertura del
+01/01/2026: nel DBF il valore e \texttt{IMPORTOLIT = 329786.51} e il flag e
+\texttt{D}.
+
+\subsection{Release contabile e file batch}
+
+La release CBR e collocata in:
+
+\begin{lstlisting}
+Release\release_contabilita_CBR
+\end{lstlisting}
+
+La struttura e:
+
+\begin{lstlisting}
+release_contabilita_CBR\
+|-- Contabilita\
+|   |-- Crea_Report.exe
+|   |-- _internal\
+|   |-- config\
+|   |   `-- contabilita_config.json
+|   |-- logs\
+|   `-- run_contabilita.bat
+`-- Contabilita CBR\
+    `-- schede_contabili.xlsx
+\end{lstlisting}
+
+Il batch:
+
+\begin{enumerate}
+  \item si posiziona nella propria cartella;
+  \item crea la cartella dei log se non esiste;
+  \item imposta la sorgente DBF CBR;
+  \item imposta la cartella di esportazione;
+  \item avvia \texttt{Crea\_Report.exe} con il config contabile;
+  \item salva output ed errori in un file di log con data e ora;
+  \item restituisce il codice di uscita dell'eseguibile.
+\end{enumerate}
+
+Per eseguire la release e sufficiente avviare:
+
+\begin{lstlisting}
+Contabilita\run_contabilita.bat
+\end{lstlisting}
+
+Un codice di uscita \texttt{0} indica che il report e stato completato.
+In caso di errore, il primo controllo da fare e il file piu recente nella
+cartella \texttt{Contabilita/logs}.
+
+\subsection{Procedura consigliata per creare un nuovo config}
+
+\begin{enumerate}
+  \item Identificare i DBF e i campi necessari.
+  \item Scegliere la sorgente principale con \texttt{base\_source}.
+  \item Dichiarare per prime le sorgenti usate da eventuali
+        \texttt{filter\_in}.
+  \item Applicare \texttt{date\_filter} e \texttt{row\_filter} il prima
+        possibile per ridurre i dati letti.
+  \item Definire le join usando i nomi completi di suffisso.
+  \item Limitare il dataset mediante \texttt{keep\_columns}.
+  \item Rinominare le colonne con \texttt{rename\_columns}.
+  \item Aggiungere copie e derivazioni nell'ordine delle loro dipendenze.
+  \item Configurare \texttt{include\_rows} e \texttt{drop\_rows} sui nomi
+        successivi alla rinomina.
+  \item Definire \texttt{group\_by} e \texttt{aggregations}, oppure usare un
+        elenco vuoto per un report di dettaglio.
+  \item Definire l'ordine finale con \texttt{columns}.
+  \item Configurare larghezze e formati Excel.
+  \item Attivare \texttt{fast\_format} per file molto grandi.
+  \item Provare prima il comando con \texttt{--no-open}.
+  \item Controllare numero di righe, intestazioni, formati e alcuni record
+        noti prima di creare la release.
+\end{enumerate}
+
+\subsection{Errori comuni}
+
+\begin{description}
+  \item[DBF mancante]
+  Controllare \texttt{file}, la sorgente scelta e
+  \texttt{PROGETTO\_CAVE\_DBF\_DIR}.
+
+  \item[Colonna assente nel file Excel]
+  Controllare il nome originale, il suffisso, \texttt{keep\_columns},
+  \texttt{rename\_columns} e infine \texttt{reports.columns}.
+
+  \item[Join senza risultati]
+  Controllare i tipi di dato, gli spazi, gli zeri iniziali e il tipo
+  \texttt{inner}/\texttt{left}. Se necessario usare una trasformazione della
+  chiave.
+
+  \item[\texttt{filter\_in} non funzionante]
+  Verificare che la sorgente richiamata sia dichiarata prima.
+
+  \item[Condizione logica errata]
+  Rappresentare sempre esplicitamente le parentesi SQL mediante gruppi
+  \texttt{all} e \texttt{any}.
+
+  \item[Importi nel lato sbagliato]
+  Verificare i valori reali di \texttt{DAREFLAG}; per la contabilita CBR
+  \texttt{D} significa Dare e \texttt{A} significa Avere.
+
+  \item[Excel segnala formule rimosse]
+  Assicurarsi di usare una release aggiornata. Il writer attuale salva come
+  testo i valori DBF che iniziano con \texttt{=}.
+
+  \item[Il file Excel e aperto]
+  Se il file principale non puo essere sovrascritto, il programma crea una
+  copia con data e ora nel nome.
+
+  \item[Report molto lento]
+  Ridurre i campi in \texttt{columns}, filtrare durante la lettura e attivare
+  \texttt{fast\_format}.
+\end{description}

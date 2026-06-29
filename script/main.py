@@ -19,7 +19,7 @@ else:
 
 CONFIG_DIR = BASE_DIR / "config"
 ESEMPI_DIR = BASE_DIR / "esempi"
-RETE_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
+ICR_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
 CBR_DIR = Path(r"\\172.16.2.13\arca\ditte\CBR")
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "report_config.json"
 
@@ -30,7 +30,7 @@ def base_dbf_dir(sorgente):
         return Path(dbf_dir)
     if sorgente == "cbr":
         return CBR_DIR
-    return RETE_DIR if sorgente == "rete" else ESEMPI_DIR
+    return ICR_DIR if sorgente == "icr" else ESEMPI_DIR
 
 
 def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH):
@@ -390,7 +390,7 @@ def periodo_intervallo(periodi):
     return "__RANGE__", data_inizio, data_fine
 
 
-def esegui_periodo(menno, nome_report=None, sorgente="rete", config_path=DEFAULT_CONFIG_PATH):
+def esegui_periodo(menno, nome_report=None, sorgente="icr", config_path=DEFAULT_CONFIG_PATH):
     config_report = report_config.carica(config_path, nome_report)
     config_report = prepara_config_periodo(config_report, menno)
     df_report = prepara_df_report(menno, sorgente, config_report)
@@ -398,7 +398,7 @@ def esegui_periodo(menno, nome_report=None, sorgente="rete", config_path=DEFAULT
     return df_report, config_report
 
 
-def esegui_tutto(nome_report=None, sorgente="rete", numero_mesi=3, config_path=DEFAULT_CONFIG_PATH):
+def esegui_tutto(nome_report=None, sorgente="icr", numero_mesi=3, config_path=DEFAULT_CONFIG_PATH):
     risultati = []
     config_report_base = report_config.carica(config_path, nome_report)
     dataset_config = config_report_base["dataset_config"]
@@ -431,9 +431,9 @@ if __name__ == "__main__":
         parser.add_argument("--report", help="Nome report definito in config/report_config.json")
         parser.add_argument(
             "--source",
-            choices=["rete", "cbr", "esempi"],
-            default="rete",
-            help="Sorgente DBF. Usa rete per ICR, cbr per CBR, esempi per DBF locali.",
+            choices=["icr", "cbr", "esempi"],
+            default="icr",
+            help="Sorgente DBF. Usa icr per ICR, cbr per CBR, esempi per DBF locali.",
         )
         parser.add_argument(
             "--months",
