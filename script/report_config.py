@@ -1,7 +1,9 @@
 import json
+from pathlib import Path
 
 
 def carica(percorso, nome_report=None):
+    percorso = Path(percorso)
     with open(percorso, "r", encoding="utf-8") as f:
         config = json.load(f)
 
@@ -29,9 +31,11 @@ def carica(percorso, nome_report=None):
         raise ValueError(f"Report '{report_nome}' non configurato. Disponibili: {disponibili}")
 
     report = prepara_report(report_nome)
+    report["_config_dir"] = percorso.resolve().parent
     extra_sheets = []
     for extra_sheet in report.get("extra_sheets", []):
         extra_report = prepara_report(extra_sheet["report"])
+        extra_report["_config_dir"] = percorso.resolve().parent
         override = {
             chiave: valore
             for chiave, valore in extra_sheet.items()

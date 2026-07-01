@@ -164,6 +164,95 @@
         "DESCRIZION_anagrafe": "Ragione_Sociale"
       },
       "calculated_fields": ["Younth", "Cava", "Val_tot"]
+    },
+    "arca_documenti_dettaglio": {
+      "sources": {
+        "doctes": {
+          "file": "doctes.DBF",
+          "suffix": "",
+          "columns": [
+            "TIPODOC",
+            "NUMERODOC",
+            "DATADOC",
+            "CODICECF",
+            "ID"
+          ],
+          "date_filter": {
+            "column": "DATADOC"
+          }
+        },
+        "docrig": {
+          "file": "docrig.DBF",
+          "suffix": "",
+          "columns": [
+            "CODICEARTI",
+            "UNMISURA",
+            "QUANTITA",
+            "SCONTI",
+            "PREZZOUN",
+            "DESCRIZION",
+            "PREZZOACQ",
+            "SCONTIV",
+            "ID_TESTA"
+          ],
+          "filter_in": {
+            "column": "ID_TESTA",
+            "source": "doctes",
+            "source_column": "ID"
+          }
+        },
+        "anagrafe": {
+          "file": "anagrafe.DBF",
+          "suffix": "anagrafe",
+          "columns": ["DESCRIZION", "CODICE"]
+        }
+      },
+      "base_source": "doctes",
+      "joins": [
+        {
+          "source": "docrig",
+          "left_on": "ID_",
+          "right_on": "ID_TESTA_",
+          "how": "inner"
+        },
+        {
+          "source": "anagrafe",
+          "left_on": "CODICECF_",
+          "right_on": "CODICE_anagrafe",
+          "how": "inner"
+        }
+      ],
+      "keep_columns": [
+        "TIPODOC_",
+        "NUMERODOC_",
+        "DATADOC_",
+        "CODICECF_",
+        "CODICEARTI_",
+        "UNMISURA_",
+        "QUANTITA_",
+        "SCONTI_",
+        "PREZZOUN_",
+        "PREZZOACQ_",
+        "SCONTIV_",
+        "DESCRIZION_",
+        "DESCRIZION_anagrafe"
+      ],
+      "rename_columns": {
+        "TIPODOC_": "tipo_documento",
+        "NUMERODOC_": "numero_documento",
+        "DATADOC_": "data_documento",
+        "CODICECF_": "Codice_Cliente_Fornitore",
+        "CODICEARTI_": "Codice_Articolo",
+        "UNMISURA_": "UM",
+        "QUANTITA_": "Quantita",
+        "SCONTI_": "Sconti_Docrig",
+        "PREZZOUN_": "prezzo_unitario_docrig",
+        "PREZZOACQ_": "Prezzo_Trasp",
+        "SCONTIV_": "sconti_valore_docrig",
+        "DESCRIZION_": "Descrizione_Riga",
+        "DESCRIZION_anagrafe": "Ragione_Sociale"
+      },
+      "calculated_fields": ["Younth", "Cava"]
     }
   },
   "reports": {
@@ -246,26 +335,22 @@
             "Val_tot": "#,##0.00"
           }
         }
+      ],
+      "extra_sheets": [
+        {
+          "report": "righe_dettaglio"
+        }
       ]
     },
     "righe_dettaglio": {
-      "dataset": "arca_documenti",
+      "dataset": "arca_documenti_dettaglio",
       "output_file": "righe_dettaglio_{periodo_file}.xlsx",
       "main_sheet": "Dettaglio",
       "freeze_panes": "D2",
       "drop_rows": [
         {
-          "all": [
-            {
-              "column": "Codice_Articolo",
-              "operator": "blank"
-            },
-            {
-              "column": "Val_tot",
-              "operator": "eq",
-              "value": 0
-            }
-          ]
+          "column": "Codice_Articolo",
+          "operator": "blank"
         }
       ],
       "group_by": [],
@@ -275,12 +360,12 @@
         "Younth",
         "Codice_Articolo",
         "Descrizione_Riga",
+        "UM",
         "Quantita",
         "prezzo_unitario_docrig",
         "Sconti_Docrig",
         "Prezzo_Trasp",
         "sconti_valore_docrig",
-        "Val_tot",
         "Cava",
         "Codice_Cliente_Fornitore",
         "Ragione_Sociale"
@@ -296,23 +381,8 @@
         "prezzo_unitario_docrig": "#,##0.00",
         "Sconti_Docrig": "#,##0.00",
         "Prezzo_Trasp": "#,##0.00",
-        "sconti_valore_docrig": "#,##0.00",
-        "Val_tot": "#,##0.00"
-      },
-      "summaries": [
-        {
-          "sheet_name": "Riepilogo_Cave",
-          "group_by": ["Cava"],
-          "aggregations": {
-            "Quantita": "sum",
-            "Val_tot": "sum"
-          },
-          "number_formats": {
-            "Quantita": "#,##0.00",
-            "Val_tot": "#,##0.00"
-          }
-        }
-      ]
+        "sconti_valore_docrig": "#,##0.00"
+      }
     }
   }
 }

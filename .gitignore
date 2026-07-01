@@ -19,11 +19,14 @@ __pycache__/
 *.py[cod]
 build_pyinstaller/
 build_pyinstaller_onedir/
+build_pyinstaller_onefile/
 script/build/
 script/dist/
 *.spec
+!Crea_Report.spec
 
 # Pacchetto eseguibile locale
+/release/
 release/*.exe
 release/logs/
 release/config/

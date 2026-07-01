@@ -46,7 +46,7 @@ def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH)
     ]
     config_da_verificare = [config_path]
     if "Cava" in set(dataset_config.get("calculated_fields", [])):
-        config_da_verificare.append(CONFIG_DIR / "config_cava.txt")
+        config_da_verificare.append(Path(config_path).resolve().parent / "config_cava.txt")
 
     config_mancanti = [
         str(percorso)
@@ -60,7 +60,7 @@ def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH)
         raise FileNotFoundError("Config mancanti:\n" + "\n".join(config_mancanti))
 
     print(f"Sorgente DBF: {base_dir}")
-    print(f"Config progetto: {CONFIG_DIR}")
+    print(f"Config progetto: {Path(config_path).resolve().parent}")
 
 
 def verifica_percorsi_report(sorgente, config_report, config_path=DEFAULT_CONFIG_PATH):
@@ -199,8 +199,8 @@ def _calcola_younth(df, menno):
     return df
 
 
-def _calcola_cava(df):
-    mappa_cave = carica_cave(CONFIG_DIR / "config_cava.txt")
+def _calcola_cava(df, config_dir=CONFIG_DIR):
+    mappa_cave = carica_cave(Path(config_dir) / "config_cava.txt")
     df["Cava"] = (
         df["Codice_Articolo"]
         .astype(str)
@@ -233,13 +233,13 @@ def _calcola_val_tot(df):
     return df
 
 
-def applica_campi_calcolati(df, dataset_config, menno):
+def applica_campi_calcolati(df, dataset_config, menno, config_dir=CONFIG_DIR):
     calculated_fields = set(dataset_config.get("calculated_fields", []))
 
     if "Younth" in calculated_fields:
         df = _calcola_younth(df, menno)
     if "Cava" in calculated_fields:
-        df = _calcola_cava(df)
+        df = _calcola_cava(df, config_dir)
     if "Val_tot" in calculated_fields:
         df = _calcola_val_tot(df)
 
@@ -333,10 +333,10 @@ def applica_filtri_report(df, config_report):
     return df_filtrato
 
 
-def prepara_base_dati(menno, sorgente, dataset_config):
+def prepara_base_dati(menno, sorgente, dataset_config, config_dir=CONFIG_DIR):
     df = df_format.esegui(base_dbf_dir(sorgente), dataset_config, menno)
     df = _applica_colonne_dataset(df, dataset_config)
-    df = applica_campi_calcolati(df, dataset_config, menno)
+    df = applica_campi_calcolati(df, dataset_config, menno, config_dir)
     return df
 
 
@@ -368,7 +368,12 @@ def prepara_config_periodo(config_report, menno):
 
 
 def prepara_df_report(menno, sorgente, config_report):
-    df_base = prepara_base_dati(menno, sorgente, config_report["dataset_config"])
+    df_base = prepara_base_dati(
+        menno,
+        sorgente,
+        config_report["dataset_config"],
+        config_report.get("_config_dir", CONFIG_DIR),
+    )
     return applica_config_report(df_base, config_report)
 
 
@@ -414,7 +419,12 @@ def esegui_tutto(nome_report=None, sorgente="icr", numero_mesi=3, config_path=DE
     if not periodi:
         return risultati
 
-    df_base = prepara_base_dati(periodo_intervallo(periodi), sorgente, dataset_config)
+    df_base = prepara_base_dati(
+        periodo_intervallo(periodi),
+        sorgente,
+        dataset_config,
+        config_report_base.get("_config_dir", CONFIG_DIR),
+    )
 
     for menno in periodi:
         config_report = prepara_config_periodo(config_report_base, menno)

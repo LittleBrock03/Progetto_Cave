@@ -957,50 +957,65 @@ La prima riga e stata verificata con la registrazione di apertura del
 01/01/2026: nel DBF il valore e \texttt{IMPORTOLIT = 329786.51} e il flag e
 \texttt{D}.
 
-\subsection{Release contabile e file batch}
+\subsection{Release unica e file batch}
 
-La release CBR e collocata in:
-
-\begin{lstlisting}
-Release\release_contabilita_CBR
-\end{lstlisting}
-
-La struttura e:
+La release non viene piu duplicata per ogni tipo di report. Il comando
+\texttt{build\_release.bat} crea un eseguibile PyInstaller \emph{onefile}, che
+viene collocato direttamente nella radice \texttt{Release}:
 
 \begin{lstlisting}
-release_contabilita_CBR\
-|-- Contabilita\
-|   |-- Crea_Report.exe
-|   |-- _internal\
-|   |-- config\
-|   |   `-- contabilita_config.json
-|   |-- logs\
-|   `-- run_contabilita.bat
-`-- Contabilita CBR\
-    `-- schede_contabili.xlsx
+Release\
+|-- Crea_Report.exe
+|-- Batch\
+|   |-- _esegui_report.bat
+|   |-- run_contabilita_CBR.bat
+|   |-- run_report_cave_ICR.bat
+|   |-- run_tutti_anagrafica_CBR.bat
+|   `-- run_tutti_anagrafica_ICR.bat
+|-- release_anagrafica_CBR\
+|-- release_anagrafica_ICR\
+|-- release_contabilita_CBR\
+`-- release_report_cave_ICR\
 \end{lstlisting}
 
-Il batch:
+Tutti i batch richiamano lo stesso \texttt{Crea\_Report.exe}. Ogni launcher
+indica al batch comune il file JSON da caricare, la sorgente DBF e la cartella
+di esportazione. Le configurazioni rimangono nelle cartelle delle rispettive
+release. Per esempio, \texttt{run\_contabilita\_CBR.bat} usa la config in
+\texttt{release\_contabilita\_CBR}, mentre
+\texttt{run\_report\_cave\_ICR.bat} usa quella in
+\texttt{release\_report\_cave\_ICR}.
+
+Il batch comune:
 
 \begin{enumerate}
   \item si posiziona nella propria cartella;
   \item crea la cartella dei log se non esiste;
-  \item imposta la sorgente DBF CBR;
+  \item riceve dal launcher la sorgente DBF ICR oppure CBR;
   \item imposta la cartella di esportazione;
-  \item avvia \texttt{Crea\_Report.exe} con il config contabile;
+  \item avvia \texttt{Crea\_Report.exe} con il config richiesto;
   \item salva output ed errori in un file di log con data e ora;
   \item restituisce il codice di uscita dell'eseguibile.
 \end{enumerate}
 
-Per eseguire la release e sufficiente avviare:
+Per l'esecuzione pianificata si usa
+\texttt{Batch\textbackslash run\_report\_periodico.bat}, che richiama il batch
+totale \texttt{run\_tutti\_periodico.bat}. Il batch totale avvia tutti i report
+anche quando uno dei precedenti termina con errore. Al termine, se sono
+presenti errori, crea sul Desktop il file
+\texttt{Crea\_Report\_ERRORI.txt} con i nomi dei report non completati e i
+relativi codici di uscita. Se tutti i report riescono, elimina l'eventuale nota
+rimasta da un'esecuzione precedente.
+
+Per eseguire il report contabile e sufficiente avviare:
 
 \begin{lstlisting}
-Contabilita\run_contabilita.bat
+Release\Batch\run_contabilita_CBR.bat
 \end{lstlisting}
 
 Un codice di uscita \texttt{0} indica che il report e stato completato.
 In caso di errore, il primo controllo da fare e il file piu recente nella
-cartella \texttt{Contabilita/logs}.
+cartella \texttt{logs} della release corrispondente.
 
 \subsection{Procedura consigliata per creare un nuovo config}
 
