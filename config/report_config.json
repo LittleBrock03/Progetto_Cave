@@ -173,8 +173,10 @@
           "columns": [
             "TIPODOC",
             "NUMERODOC",
+            "NUMERODOCCF",
             "DATADOC",
             "CODICECF",
+            "DESTDIV",
             "ID"
           ],
           "date_filter": {
@@ -190,9 +192,15 @@
             "QUANTITA",
             "SCONTI",
             "PREZZOUN",
+            "GRUPPO",
             "DESCRIZION",
+            "PREZZO",
+            "CDCCOSTO",
+            "CDCRICAVO",
+            "CANVDS",
             "PREZZOACQ",
             "SCONTIV",
+            "CONTOSCARI",
             "ID_TESTA"
           ],
           "filter_in": {
@@ -200,6 +208,31 @@
             "source": "doctes",
             "source_column": "ID"
           }
+        },
+        "vincfatt": {
+          "file": "VINCFATT.DBF",
+          "suffix": "vincfatt",
+          "columns": ["CODICE", "CONTO", "DESCRIZION"]
+        },
+        "canvds": {
+          "file": "CANVDS.DBF",
+          "suffix": "canvds2",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "cdccos": {
+          "file": "cdcedili.DBF",
+          "suffix": "cdcedili3",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "cdcric": {
+          "file": "cdcedili.DBF",
+          "suffix": "cdcedili4",
+          "columns": ["DESCRIZION", "CODICE"]
+        },
+        "maggrp": {
+          "file": "MAGGRP.DBF",
+          "suffix": "maggrp",
+          "columns": ["DESCRIZION", "CODICE"]
         },
         "anagrafe": {
           "file": "anagrafe.DBF",
@@ -216,6 +249,36 @@
           "how": "inner"
         },
         {
+          "source": "vincfatt",
+          "left_on": "CONTOSCARI_",
+          "right_on": "CODICE_vincfatt",
+          "how": "left"
+        },
+        {
+          "source": "canvds",
+          "left_on": "CANVDS_",
+          "right_on": "CODICE_canvds2",
+          "how": "left"
+        },
+        {
+          "source": "cdccos",
+          "left_on": "CDCCOSTO_",
+          "right_on": "CODICE_cdcedili3",
+          "how": "left"
+        },
+        {
+          "source": "cdcric",
+          "left_on": "CDCRICAVO_",
+          "right_on": "CODICE_cdcedili4",
+          "how": "left"
+        },
+        {
+          "source": "maggrp",
+          "left_on": "GRUPPO_",
+          "right_on": "CODICE_maggrp",
+          "how": "left"
+        },
+        {
           "source": "anagrafe",
           "left_on": "CODICECF_",
           "right_on": "CODICE_anagrafe",
@@ -225,31 +288,57 @@
       "keep_columns": [
         "TIPODOC_",
         "NUMERODOC_",
+        "NUMERODOCCF_",
         "DATADOC_",
         "CODICECF_",
+        "DESTDIV_",
         "CODICEARTI_",
         "UNMISURA_",
         "QUANTITA_",
         "SCONTI_",
         "PREZZOUN_",
+        "PREZZO_",
+        "GRUPPO_",
+        "CANVDS_",
+        "CONTOSCARI_",
+        "CDCCOSTO_",
+        "CDCRICAVO_",
         "PREZZOACQ_",
         "SCONTIV_",
         "DESCRIZION_",
+        "DESCRIZION_vincfatt",
+        "DESCRIZION_canvds2",
+        "DESCRIZION_cdcedili3",
+        "DESCRIZION_cdcedili4",
+        "DESCRIZION_maggrp",
         "DESCRIZION_anagrafe"
       ],
       "rename_columns": {
         "TIPODOC_": "tipo_documento",
         "NUMERODOC_": "numero_documento",
+        "NUMERODOCCF_": "numero_documento_cliente",
         "DATADOC_": "data_documento",
         "CODICECF_": "Codice_Cliente_Fornitore",
+        "DESTDIV_": "destinazione_diversa",
         "CODICEARTI_": "Codice_Articolo",
         "UNMISURA_": "UM",
         "QUANTITA_": "Quantita",
         "SCONTI_": "Sconti_Docrig",
         "PREZZOUN_": "prezzo_unitario_docrig",
+        "PREZZO_": "prezzo_docrig",
+        "GRUPPO_": "gruppo_docrig",
+        "CANVDS_": "voce_di_spesa_docrig",
+        "CONTOSCARI_": "conto_scarico_docrig",
+        "CDCCOSTO_": "centro_costo_docrig",
+        "CDCRICAVO_": "centro_ricavo_docrig",
         "PREZZOACQ_": "Prezzo_Trasp",
         "SCONTIV_": "sconti_valore_docrig",
         "DESCRIZION_": "Descrizione_Riga",
+        "DESCRIZION_vincfatt": "descrizione_conto_scarico",
+        "DESCRIZION_canvds2": "descrizione_voce_di_spesa",
+        "DESCRIZION_cdcedili3": "descrizione_centro_costo",
+        "DESCRIZION_cdcedili4": "descrizione_centro_ricavo",
+        "DESCRIZION_maggrp": "descrizione_gruppo",
         "DESCRIZION_anagrafe": "Ragione_Sociale"
       },
       "calculated_fields": ["Younth", "Cava"]
@@ -356,29 +445,34 @@
       "group_by": [],
       "columns": [
         "tipo_documento",
-        "numero_documento",
-        "Younth",
+        "data_documento",
+        "gruppo_docrig",
         "Codice_Articolo",
         "Descrizione_Riga",
         "UM",
         "Quantita",
         "prezzo_unitario_docrig",
-        "Sconti_Docrig",
-        "Prezzo_Trasp",
-        "sconti_valore_docrig",
         "Cava",
         "Codice_Cliente_Fornitore",
-        "Ragione_Sociale"
+        "Ragione_Sociale",
+        "Sconti_Docrig"
       ],
       "column_widths": {
         "Descrizione_Riga": 54,
         "Ragione_Sociale": 36,
-        "Codice_Cliente_Fornitore": 24
+        "Codice_Cliente_Fornitore": 24,
+        "destinazione_diversa": 18,
+        "descrizione_gruppo": 30,
+        "descrizione_voce_di_spesa": 30,
+        "descrizione_conto_scarico": 30,
+        "descrizione_centro_costo": 30,
+        "descrizione_centro_ricavo": 30
       },
       "wrap_columns": ["Descrizione_Riga"],
       "number_formats": {
         "Quantita": "#,##0.00",
         "prezzo_unitario_docrig": "#,##0.00",
+        "prezzo_docrig": "#,##0.00",
         "Sconti_Docrig": "#,##0.00",
         "Prezzo_Trasp": "#,##0.00",
         "sconti_valore_docrig": "#,##0.00"
