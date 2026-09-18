@@ -19,8 +19,7 @@ else:
 
 CONFIG_DIR = BASE_DIR / "config"
 ESEMPI_DIR = BASE_DIR / "esempi"
-ICR_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
-CBR_DIR = Path(r"\\172.16.2.13\arca\ditte\CBR")
+RETE_DIR = Path(r"\\172.16.2.13\arca\ditte\ICR")
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "report_config.json"
 
 
@@ -28,9 +27,7 @@ def base_dbf_dir(sorgente):
     dbf_dir = os.environ.get("PROGETTO_CAVE_DBF_DIR")
     if dbf_dir:
         return Path(dbf_dir)
-    if sorgente == "cbr":
-        return CBR_DIR
-    return ICR_DIR if sorgente == "icr" else ESEMPI_DIR
+    return RETE_DIR if sorgente == "rete" else ESEMPI_DIR
 
 
 def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH):
@@ -46,7 +43,7 @@ def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH)
     ]
     config_da_verificare = [config_path]
     if "Cava" in set(dataset_config.get("calculated_fields", [])):
-        config_da_verificare.append(Path(config_path).resolve().parent / "config_cava.txt")
+        config_da_verificare.append(CONFIG_DIR / "config_cava.txt")
 
     config_mancanti = [
         str(percorso)
@@ -60,7 +57,7 @@ def verifica_percorsi(sorgente, dataset_config, config_path=DEFAULT_CONFIG_PATH)
         raise FileNotFoundError("Config mancanti:\n" + "\n".join(config_mancanti))
 
     print(f"Sorgente DBF: {base_dir}")
-    print(f"Config progetto: {Path(config_path).resolve().parent}")
+    print(f"Config progetto: {CONFIG_DIR}")
 
 
 def verifica_percorsi_report(sorgente, config_report, config_path=DEFAULT_CONFIG_PATH):
@@ -129,64 +126,6 @@ def _applica_colonne_dataset(df, dataset_config):
     if rename_columns:
         df = df.rename(columns=rename_columns)
 
-    copy_columns = dataset_config.get("copy_columns", {})
-    for colonna_sorgente, colonna_destinazione in copy_columns.items():
-        if colonna_sorgente in df.columns and colonna_destinazione not in df.columns:
-            df[colonna_destinazione] = df[colonna_sorgente]
-
-    derived_columns = dataset_config.get("derived_columns", {})
-    for colonna_destinazione, regola in derived_columns.items():
-        operazione = regola.get("operation")
-
-        if operazione == "conditional":
-            colonna_sorgente = regola.get("source")
-            condizione = regola.get("when", {})
-            colonna_condizione = condizione.get("column")
-            if colonna_sorgente not in df.columns or colonna_condizione not in df.columns:
-                continue
-
-            valori_condizione = (
-                df[colonna_condizione]
-                .astype("string")
-                .fillna("")
-                .str.strip()
-            )
-            valore_atteso = str(condizione.get("equals", "")).strip()
-            risultato = df[colonna_sorgente].where(
-                valori_condizione.eq(valore_atteso),
-                regola.get("otherwise", 0),
-            )
-            if "fillna" in regola:
-                risultato = risultato.fillna(regola["fillna"])
-            df[colonna_destinazione] = risultato
-            continue
-
-        if operazione == "subtract":
-            colonna_sinistra = regola.get("left")
-            colonna_destra = regola.get("right")
-            if colonna_sinistra not in df.columns or colonna_destra not in df.columns:
-                continue
-
-            sinistra = pd.to_numeric(df[colonna_sinistra], errors="coerce").fillna(0)
-            destra = pd.to_numeric(df[colonna_destra], errors="coerce").fillna(0)
-            df[colonna_destinazione] = sinistra - destra
-            continue
-
-        colonna_sorgente = regola.get("source")
-        if colonna_sorgente not in df.columns:
-            continue
-
-        valore = df[colonna_sorgente].astype("string").fillna("").str.strip()
-        if "left" in regola:
-            valore = valore.str[:regola["left"]]
-        if "right" in regola:
-            valore = valore.str[-regola["right"]:]
-        if "prefix" in regola:
-            valore = regola["prefix"] + valore
-        if "suffix" in regola:
-            valore = valore + regola["suffix"]
-        df[colonna_destinazione] = valore.mask(df[colonna_sorgente].isna(), "")
-
     return df
 
 
@@ -199,8 +138,8 @@ def _calcola_younth(df, menno):
     return df
 
 
-def _calcola_cava(df, config_dir=CONFIG_DIR):
-    mappa_cave = carica_cave(Path(config_dir) / "config_cava.txt")
+def _calcola_cava(df):
+    mappa_cave = carica_cave(CONFIG_DIR / "config_cava.txt")
     df["Cava"] = (
         df["Codice_Articolo"]
         .astype(str)
@@ -233,13 +172,13 @@ def _calcola_val_tot(df):
     return df
 
 
-def applica_campi_calcolati(df, dataset_config, menno, config_dir=CONFIG_DIR):
+def applica_campi_calcolati(df, dataset_config, menno):
     calculated_fields = set(dataset_config.get("calculated_fields", []))
 
     if "Younth" in calculated_fields:
         df = _calcola_younth(df, menno)
     if "Cava" in calculated_fields:
-        df = _calcola_cava(df, config_dir)
+        df = _calcola_cava(df)
     if "Val_tot" in calculated_fields:
         df = _calcola_val_tot(df)
 
@@ -268,16 +207,6 @@ def _condizione_report(df, regola):
             return numeri.eq(valore)
         if operatore == "ne":
             return numeri.ne(valore)
-        if operatore == "ge":
-            return numeri.ge(valore)
-        if operatore == "le":
-            return numeri.le(valore)
-        if operatore == "gt":
-            return numeri.gt(valore)
-        if operatore == "lt":
-            return numeri.lt(valore)
-        if operatore == "between":
-            return numeri.between(regola["min"], regola["max"], inclusive="both")
 
     testo = serie.astype("string").str.strip()
     valore_testo = str(valore).strip()
@@ -285,58 +214,30 @@ def _condizione_report(df, regola):
         return testo.eq(valore_testo)
     if operatore == "ne":
         return testo.ne(valore_testo)
-    if operatore == "ge":
-        return testo.ge(valore_testo)
-    if operatore == "le":
-        return testo.le(valore_testo)
-    if operatore == "gt":
-        return testo.gt(valore_testo)
-    if operatore == "lt":
-        return testo.lt(valore_testo)
-    if operatore == "between":
-        return testo.ge(str(regola["min"]).strip()) & testo.le(str(regola["max"]).strip())
-    if operatore == "starts_with":
-        return testo.str.startswith(valore_testo, na=False)
-    if operatore == "in":
-        valori = [str(item).strip() for item in regola.get("values", [])]
-        return testo.isin(valori)
 
     raise ValueError(f"Operatore filtro report non supportato: {operatore}")
 
 
-def _maschera_report(df, gruppo):
-    if "all" in gruppo:
-        maschera = pd.Series(True, index=df.index)
-        for regola in gruppo.get("all", []):
-            maschera &= _maschera_report(df, regola)
-        return maschera
-
-    if "any" in gruppo:
-        maschera = pd.Series(False, index=df.index)
-        for regola in gruppo.get("any", []):
-            maschera |= _maschera_report(df, regola)
-        return maschera
-
-    return _condizione_report(df, gruppo)
-
-
 def applica_filtri_report(df, config_report):
     df_filtrato = df
-    for filtro in config_report.get("include_rows", []):
-        maschera = _maschera_report(df_filtrato, filtro)
-        df_filtrato = df_filtrato.loc[maschera].copy()
-
     for filtro in config_report.get("drop_rows", []):
-        maschera = _maschera_report(df_filtrato, filtro)
+        condizioni = filtro.get("all", [])
+        if not condizioni:
+            continue
+
+        maschera = pd.Series(True, index=df_filtrato.index)
+        for regola in condizioni:
+            maschera &= _condizione_report(df_filtrato, regola)
+
         df_filtrato = df_filtrato.loc[~maschera].copy()
 
     return df_filtrato
 
 
-def prepara_base_dati(menno, sorgente, dataset_config, config_dir=CONFIG_DIR):
+def prepara_base_dati(menno, sorgente, dataset_config):
     df = df_format.esegui(base_dbf_dir(sorgente), dataset_config, menno)
     df = _applica_colonne_dataset(df, dataset_config)
-    df = applica_campi_calcolati(df, dataset_config, menno, config_dir)
+    df = applica_campi_calcolati(df, dataset_config, menno)
     return df
 
 
@@ -368,12 +269,7 @@ def prepara_config_periodo(config_report, menno):
 
 
 def prepara_df_report(menno, sorgente, config_report):
-    df_base = prepara_base_dati(
-        menno,
-        sorgente,
-        config_report["dataset_config"],
-        config_report.get("_config_dir", CONFIG_DIR),
-    )
+    df_base = prepara_base_dati(menno, sorgente, config_report["dataset_config"])
     return applica_config_report(df_base, config_report)
 
 
@@ -395,7 +291,7 @@ def periodo_intervallo(periodi):
     return "__RANGE__", data_inizio, data_fine
 
 
-def esegui_periodo(menno, nome_report=None, sorgente="icr", config_path=DEFAULT_CONFIG_PATH):
+def esegui_periodo(menno, nome_report=None, sorgente="rete", config_path=DEFAULT_CONFIG_PATH):
     config_report = report_config.carica(config_path, nome_report)
     config_report = prepara_config_periodo(config_report, menno)
     df_report = prepara_df_report(menno, sorgente, config_report)
@@ -403,7 +299,7 @@ def esegui_periodo(menno, nome_report=None, sorgente="icr", config_path=DEFAULT_
     return df_report, config_report
 
 
-def esegui_tutto(nome_report=None, sorgente="icr", numero_mesi=3, config_path=DEFAULT_CONFIG_PATH):
+def esegui_tutto(nome_report=None, sorgente="rete", numero_mesi=3, config_path=DEFAULT_CONFIG_PATH):
     risultati = []
     config_report_base = report_config.carica(config_path, nome_report)
     dataset_config = config_report_base["dataset_config"]
@@ -419,12 +315,7 @@ def esegui_tutto(nome_report=None, sorgente="icr", numero_mesi=3, config_path=DE
     if not periodi:
         return risultati
 
-    df_base = prepara_base_dati(
-        periodo_intervallo(periodi),
-        sorgente,
-        dataset_config,
-        config_report_base.get("_config_dir", CONFIG_DIR),
-    )
+    df_base = prepara_base_dati(periodo_intervallo(periodi), sorgente, dataset_config)
 
     for menno in periodi:
         config_report = prepara_config_periodo(config_report_base, menno)
@@ -441,9 +332,9 @@ if __name__ == "__main__":
         parser.add_argument("--report", help="Nome report definito in config/report_config.json")
         parser.add_argument(
             "--source",
-            choices=["icr", "cbr", "esempi"],
-            default="icr",
-            help="Sorgente DBF. Usa icr per ICR, cbr per CBR, esempi per DBF locali.",
+            choices=["rete", "esempi"],
+            default="rete",
+            help="Sorgente DBF. In produzione usa rete: i DBF sono nella cartella ICR; i config restano nel progetto.",
         )
         parser.add_argument(
             "--months",
